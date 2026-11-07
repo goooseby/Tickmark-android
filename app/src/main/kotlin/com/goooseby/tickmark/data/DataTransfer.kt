@@ -11,7 +11,7 @@ class DataTransfer(private val repo: TickRepository) {
     private fun <T> array(rows: List<T>, block: (T) -> JSONObject) = JSONArray().apply { rows.forEach { put(block(it)) } }
     suspend fun backup(): String = repo.exclusive {
         val d = repo.dao
-        obj("schemaVersion" to 1, "algorithmVersion" to 1, "zoneId" to ZoneId.systemDefault().id,
+        obj("schemaVersion" to 1, "algorithmVersion" to 2, "zoneId" to ZoneId.systemDefault().id,
             "createdAt" to System.currentTimeMillis(),
             "events" to array(d.events()) { obj("id" to it.id, "time" to it.time, "kind" to it.kind, "pkg" to it.pkg, "activity" to it.activity, "instance" to it.instance, "sequence" to it.sequence) },
             "sessions" to array(d.allSessions()) { obj("id" to it.id, "pkg" to it.pkg, "start" to it.start, "end" to it.end, "inferred" to it.inferred, "ongoing" to it.ongoing) },
@@ -24,7 +24,7 @@ class DataTransfer(private val repo: TickRepository) {
     data class Restore(val events: List<EventRow>, val sessions: List<SessionRow>, val spans: List<SpanRow>, val annotations: List<AnnotationRow>, val apps: List<AppRow>, val coverage: List<CoverageRow>, val config: List<ConfigRow>, val zone: String)
     fun parse(text: String): Restore {
         val root = JSONObject(text)
-        require(root.getInt("schemaVersion") == 1 && root.getInt("algorithmVersion") == 1) { "不支持此备份版本" }
+        require(root.getInt("schemaVersion") == 1 && root.getInt("algorithmVersion") in 1..2) { "不支持此备份版本" }
         fun <T> read(key: String, block: (JSONObject) -> T): List<T> {
             val a = root.getJSONArray(key)
             require(a.length() <= 1_000_000) { "备份记录过多" }
@@ -44,7 +44,7 @@ class DataTransfer(private val repo: TickRepository) {
         result.sessions.forEach { valid(it.start, it.end) }
         result.spans.forEach { valid(it.start, it.end) }
         result.coverage.forEach { valid(it.start, it.end); require(it.eventCount >= 0) }
-        result.events.forEach { require(it.time >= 0 && it.sequence >= 0) }
+        result.events.forEach { require(it.time >= 0 && (it.sequence >= 0 || it.kind=="OBSERVE_BOOT" && it.sequence == -1)) }
         result.annotations.forEach { valid(it.start, it.end); require(it.note.length <= 2000 && it.purpose.length <= 40) }
         val purposes = result.annotations.filter { it.purpose.isNotBlank() }.sortedBy { it.start }
         require(purposes.zipWithNext().all { (a,b) -> a.end <= b.start }) { "备份用途区间存在重叠" }
@@ -59,7 +59,7 @@ class DataTransfer(private val repo: TickRepository) {
             repo.dao.putEvents(data.events); repo.dao.putSessions(data.sessions); repo.dao.putSpans(data.spans)
             repo.dao.putAnnotations(data.annotations); repo.dao.putApps(data.apps); repo.dao.putCoverage(data.coverage)
             // Imported history is kept until the user explicitly resumes capture.
-            repo.dao.putConfig(data.config.filter { it.key != "paused" } + ConfigRow("paused", "true"))
+            repo.dao.putConfig(data.config.filter { it.key != "paused" && !it.key.startsWith("observedBoot:") } + ConfigRow("paused", "true"))
         }
     }
     suspend fun csv(): String = repo.exclusive {

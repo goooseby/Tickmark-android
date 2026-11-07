@@ -11,11 +11,23 @@ android {
         applicationId = "com.goooseby.tickmark"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("2").get().toInt()
+        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.2.0").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
+    signingConfigs {
+        create("release") {
+            val keyPath = System.getenv("TICKMARK_KEYSTORE_PATH")
+            if (!keyPath.isNullOrBlank()) {
+                storeFile = file(keyPath)
+                storePassword = System.getenv("TICKMARK_STORE_PASSWORD")
+                keyAlias = System.getenv("TICKMARK_KEY_ALIAS")
+                keyPassword = System.getenv("TICKMARK_KEY_PASSWORD")
+            }
+        }
+    }
+    buildTypes { release { if (!System.getenv("TICKMARK_KEYSTORE_PATH").isNullOrBlank()) signingConfig = signingConfigs.getByName("release") } }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

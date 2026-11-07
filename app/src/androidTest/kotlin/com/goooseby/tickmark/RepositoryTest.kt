@@ -57,4 +57,11 @@ class RepositoryTest {
         val text=DataTransfer(repo).csv()
         assertTrue(text.contains("'=SUM(A1)")); assertTrue(text.contains("\"1134\"")); assertTrue(text.contains("inferred"))
     }
+    @Test fun overlapReplayKeepsObservedStateAndDoesNotInventUnlocks() = runBlocking {
+        repo.dao.putEvents(listOf(EventRow("snapshot",100,"OBSERVE_UNLOCKED","","",0,1),EventRow("source",110,"RESUME","pkg","A",0,0)))
+        repo.dao.deleteSystemEvents(0,200)
+        assertEquals(listOf("OBSERVE_UNLOCKED"),repo.dao.events().map{it.kind})
+        val backup=DataTransfer(repo).backup()
+        assertEquals("OBSERVE_UNLOCKED",DataTransfer(repo).parse(backup).events.single().kind)
+    }
 }

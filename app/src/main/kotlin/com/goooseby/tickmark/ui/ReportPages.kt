@@ -18,10 +18,11 @@ import com.goooseby.tickmark.data.*
 import com.goooseby.tickmark.engine.model.unionDuration
 import java.time.*
 
-@Composable internal fun TodayReports(records:Records,date:LocalDate,from:Long,to:Long,filtered:Boolean,onHour:(Int)->Unit,onClearRange:()->Unit,onRange:()->Unit,onDetail:()->Unit,onApp:(SessionRow)->Unit,onEdit:(AnnotationRow)->Unit) {
+@Composable internal fun TodayReports(records:Records,date:LocalDate,from:Long,to:Long,filtered:Boolean,onHour:(Int)->Unit,onClearRange:()->Unit,onRange:()->Unit,onDetail:()->Unit,onApp:(SessionRow)->Unit,onEdit:(AnnotationRow)->Unit,onGoal:()->Unit={},onJournal:()->Unit={}) {
     fun openApp(pkg:String) { records.sessions.firstOrNull { it.pkg==pkg }?.let(onApp) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=20.dp)) {
         item { Summary(records,dayStart(date),minOf(dayStart(date.plusDays(1)),System.currentTimeMillis())) }
+        item { GoalProgress(records,date,onGoal) }
         item { ChartTitle("每小时使用", "选择时段",onRange) }
         item { HourlyChart(records,date,selectedHour=if(filtered) Instant.ofEpochMilli(from).atZone(ZoneId.systemDefault()).hour else null) { start,_ -> onHour(Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault()).hour) } }
         item {
@@ -36,7 +37,9 @@ import java.time.*
             item { ChartTitle("时段内的应用分布","复盘与标注",onDetail) }
             item { AppDistribution(records,from,to,::openApp) }
         }
-        item { CoverageNote(records,from,to) }
+        item { ChartTitle("每日复盘","写复盘",onJournal) }
+        val intention=records.config["review:$date:next"].orEmpty()
+        if(intention.isNotBlank()) item { Text(intention,Modifier.padding(horizontal=20.dp,vertical=8.dp),style=MaterialTheme.typography.bodyMedium) }
         val notes=records.annotations.filter { it.start<to && it.end>from }
         if(notes.isNotEmpty()) {
             item { ChartTitle("标注") }
@@ -54,6 +57,8 @@ import java.time.*
         item { CompositionChart(records,from,to,onApp) }
         item { ChartTitle("使用时段") }
         item { AppDistribution(records,from,to,onApp) }
+        item { ChartTitle("用途构成") }
+        item { PurposeReport(records,from,to) }
         item { CoverageNote(records,from,to) }
     }
 }
@@ -89,6 +94,7 @@ import java.time.*
                     Metric("活跃小时",hourBoundaries(date).zipWithNext().count { (a,b) -> sessions.any { it.start<minOf(b,to) && it.end>maxOf(a,from) } }.toString(),Modifier.weight(.7f))
                 }
             }
+            item { AppGoalProgress(records,pkg,date) }
             item { ChartTitle("当天使用分布") }
             item { HourlyChart(records,date,pkg,selectedBin?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).hour }) { a,_ -> selectedBin=a } }
             selectedBin?.let { start -> item {
@@ -126,7 +132,5 @@ import java.time.*
     ListItem(headlineContent={ Text(a.purpose.ifEmpty { "备注" }) },supportingContent={ Text("${clock(maxOf(a.start,from))} – ${clock(minOf(a.end,to))}${if(a.note.isNotBlank()) " · ${a.note}" else ""}",maxLines=2,overflow=TextOverflow.Ellipsis) },trailingContent={ Icon(Icons.Outlined.EditNote,null) },modifier=Modifier.clickable(onClick=onClick))
 }
 @Composable private fun CoverageNote(records:Records,from:Long,to:Long) {
-    val unknown=records.spans.filter { it.state=="UNKNOWN" }.sumOf { com.goooseby.tickmark.engine.model.overlap(it.start,it.end,from,to) }
-    val queried=records.coverage.any { it.start<to && it.end>from }
-    Text(when { !queried -> "所选时段尚无查询记录"; unknown>0 -> "部分时段屏幕状态不足，推算与已确认时长分开展示"; else -> "统计时区：${ZoneId.systemDefault().id}" },Modifier.padding(horizontal=20.dp,vertical=12.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    // Coverage explanations live behind the summary info button and collection status.
 }

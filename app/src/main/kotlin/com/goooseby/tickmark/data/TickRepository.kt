@@ -7,6 +7,9 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
 import android.os.Process
+import android.os.PowerManager
+import android.os.SystemClock
+import android.provider.Settings
 import android.os.UserManager
 import androidx.room.withTransaction
 import com.goooseby.tickmark.engine.model.*
@@ -74,13 +77,25 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
                     val old = rules[pkg]
                     (old ?: AppRow(pkg, pkg, hidden = pkg == home || pkg == "com.android.systemui" || pkg == "android")).copy(name = if (pkg == home) "桌面" else name ?: old?.name ?: pkg)
                 }
+                val observedAt=System.currentTimeMillis()
+                val interactive=context.getSystemService(PowerManager::class.java).isInteractive
+                val locked=context.getSystemService(KeyguardManager::class.java).isKeyguardLocked
+                val observations=mutableListOf(
+                    EventRow("observe:$observedAt:screen",observedAt,if(interactive) "OBSERVE_SCREEN_ON" else "OBSERVE_SCREEN_OFF","","",0,Int.MAX_VALUE-1),
+                    EventRow("observe:$observedAt:keyguard",observedAt,if(locked) "OBSERVE_LOCKED" else "OBSERVE_UNLOCKED","","",0,Int.MAX_VALUE))
+                val bootCount=Settings.Global.getInt(context.contentResolver,Settings.Global.BOOT_COUNT,-1)
+                val bootKey="observedBoot:$bootCount"
+                val bootTime=config[bootKey]?.toLongOrNull() ?: (observedAt-SystemClock.elapsedRealtime()).coerceAtLeast(0)
+                if(bootCount>=0 && config[bootKey]==null) observations+=EventRow("observe:boot:$bootCount:$bootTime",bootTime,"OBSERVE_BOOT","","",0,-1)
                 db.withTransaction {
-                    dao.deleteEvents(from, now)
+                    dao.deleteSystemEvents(from, now)
                     dao.putEvents(rows)
+                    dao.putEvents(observations)
                     dao.putApps(metadata)
-                    rebuild(now)
+                    rebuild(observedAt)
                     dao.putCoverage(listOf(CoverageRow(from, now, rows.size)))
-                    dao.putConfig(listOf(ConfigRow("lastSync", now.toString()), ConfigRow("captureStart", first.toString())))
+                    dao.putConfig(listOf(ConfigRow("lastSync", now.toString()), ConfigRow("captureStart", first.toString()),ConfigRow("lastObserved",observedAt.toString()),ConfigRow("algorithmVersion","2")))
+                    if(bootCount>=0) dao.putConfig(listOf(ConfigRow(bootKey,bootTime.toString())))
                 }
                 message.value = null
             } catch (e: Exception) {
@@ -117,6 +132,9 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
         }
     }
     suspend fun deleteAnnotation(id: String) = withContext(Dispatchers.IO) { dao.deleteAnnotation(id) }
+    suspend fun setConfig(vararg values: Pair<String,String>) = withContext(Dispatchers.IO) {
+        mutex.withLock { dao.putConfig(values.map { ConfigRow(it.first,it.second) }) }
+    }
     suspend fun setPaused(paused: Boolean) = withContext(Dispatchers.IO) {
         mutex.withLock { dao.putConfig(listOf(ConfigRow("paused", paused.toString()))) }
     }

@@ -67,6 +67,30 @@ class SessionEngineTest {
         assertFalse(r.sessions.single().inferred)
         assertTrue(SessionEngine.reconstruct(events,20).sessions.single().inferred)
     }
+    @Test fun startupKeepsScreenEventFromNewBootInsteadOfLosingIt() {
+        val r=SessionEngine.reconstruct(listOf(e(0,EventKind.SHUTDOWN),e(100,EventKind.SCREEN_ON),e(110,EventKind.STARTUP),e(120,EventKind.RESUME,"a")),200,screenOnly=true)
+        assertEquals(100L,r.deviceSpans.filter { it.state==DeviceState.IN_USE }.sumOf { it.end-it.start })
+        assertFalse(r.sessions.single().inferred)
+    }
+    @Test fun startupWithoutShutdownDoesNotReusePreviousBootState() {
+        val r=SessionEngine.reconstruct(listOf(e(0,EventKind.SCREEN_ON),e(10,EventKind.STARTUP)),20,screenOnly=true)
+        assertEquals(DeviceState.UNKNOWN,r.deviceSpans.last().state)
+    }
+    @Test fun observationOnlyResolvesStateFromObservationTime() {
+        val r=replay(e(0,EventKind.RESUME,"a"),e(50,EventKind.OBSERVE_SCREEN_ON),e(50,EventKind.OBSERVE_UNLOCKED),until=100)
+        assertEquals(listOf(true,false),r.sessions.map { it.inferred })
+        assertEquals(listOf(50L,50L),r.sessions.map { it.duration })
+    }
+    @Test fun previousBootActivitiesCannotLeakAcrossShutdown() {
+        val r=SessionEngine.reconstruct(listOf(e(0,EventKind.RESUME,"old"),e(10,EventKind.SHUTDOWN),e(100,EventKind.SCREEN_ON),e(110,EventKind.STARTUP)),200,screenOnly=true)
+        assertEquals(10L,r.sessions.single().duration)
+    }
+    @Test fun observedBootStopsOldDeviceAndForegroundAcrossGap() {
+        val r=SessionEngine.reconstruct(listOf(e(0,EventKind.SCREEN_ON),e(10,EventKind.RESUME,"old"),e(1000,EventKind.OBSERVE_BOOT),e(1010,EventKind.SCREEN_ON),e(1020,EventKind.RESUME,"new")),1100,screenOnly=true)
+        assertTrue(r.sessions.none { it.packageName=="old" && it.end>10 })
+        assertEquals(DeviceState.UNKNOWN,r.deviceSpans.find {it.start==10L}?.state)
+        assertEquals(100L,r.deviceSpans.filter {it.state==DeviceState.IN_USE}.sumOf {it.end-it.start})
+    }
     @Test fun sameMillisecondOrderIsPreserved() {
         val r=replay(e(0,EventKind.RESUME,"a"),e(10,EventKind.PAUSE,"a"),e(10,EventKind.RESUME,"a"),until=20)
         assertEquals(20L,unionDuration(r.sessions.map { it.start to it.end }))

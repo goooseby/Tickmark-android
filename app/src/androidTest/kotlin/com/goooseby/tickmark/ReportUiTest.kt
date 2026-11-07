@@ -92,4 +92,41 @@ class ReportUiTest {
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("每日使用").assertExists()
     }
+    @Test fun settingsGroupsAppsAndGoalsAndKeepsExplanationsOutOfHome() {
+        compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
+        compose.setContent { Tickmark(repo) }
+        compose.onNodeWithText("另有",substring=true).assertDoesNotExist()
+        compose.onNodeWithText("未设置安全锁屏",substring=true).assertDoesNotExist()
+        compose.onNodeWithText("设置").performClick()
+        compose.onNodeWithText("浏览器").assertDoesNotExist()
+        screenshot("settings-home")
+        compose.onNodeWithText("应用管理").performClick()
+        compose.onNode(hasSetTextAction()).performTextInput("浏览器")
+        compose.onNode(hasText("浏览器") and !hasSetTextAction()).performClick()
+        compose.onNodeWithText("默认用途").assertIsDisplayed()
+        compose.onNodeWithText("学习").performClick()
+        compose.waitForIdle()
+        runBlocking { Assert.assertEquals("学习",repo.dao.allApps().find {it.pkg=="sample.browser"}?.purpose) }
+        compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithText("每日目标").performClick()
+        compose.onNode(hasSetTextAction()).performTextReplacement("90")
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("保存目标"))
+        compose.onNodeWithText("保存目标").performClick()
+        compose.waitForIdle()
+        runBlocking { Assert.assertEquals("90",repo.dao.allConfig().find{it.key=="dailyGoalMinutes"}?.value) }
+    }
+    @Test fun reflectionPersistsWithoutIntroducingSessionList() {
+        compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
+        compose.setContent { Tickmark(repo) }
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("写复盘"))
+        compose.onNodeWithText("写复盘").performClick()
+        compose.onAllNodes(hasSetTextAction())[0].performTextInput("提前放下手机")
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("明天的一个小行动"))
+        compose.onNodeWithText("明天的一个小行动").performTextInput("睡前先读十页")
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("保存复盘"))
+        compose.onNodeWithText("保存复盘").performClick()
+        compose.waitForIdle()
+        runBlocking { Assert.assertEquals("睡前先读十页",repo.dao.allConfig().find{it.key=="review:${LocalDate.now()}:next"}?.value) }
+    }
 }

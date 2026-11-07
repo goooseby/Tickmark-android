@@ -27,7 +27,7 @@ interface TickDao {
     @Query("SELECT * FROM metadata") fun apps(): Flow<List<AppRow>>
     @Query("SELECT * FROM coverage ORDER BY start") fun coverage(): Flow<List<CoverageRow>>
     @Query("SELECT * FROM config") fun config(): Flow<List<ConfigRow>>
-    @Query("SELECT e.time FROM events e WHERE e.kind = 'UNLOCK' AND (SELECT p.kind FROM events p WHERE (p.time < e.time OR (p.time = e.time AND p.sequence < e.sequence)) AND p.kind IN ('LOCK','UNLOCK','STARTUP','SHUTDOWN') ORDER BY p.time DESC, p.sequence DESC LIMIT 1) = 'LOCK'")
+    @Query("SELECT e.time FROM events e WHERE e.kind = 'UNLOCK' AND (SELECT p.kind FROM events p WHERE (p.time < e.time OR (p.time = e.time AND p.sequence < e.sequence)) AND p.kind IN ('LOCK','UNLOCK','STARTUP','SHUTDOWN','OBSERVE_LOCKED','OBSERVE_UNLOCKED') ORDER BY p.time DESC, p.sequence DESC LIMIT 1) IN ('LOCK','OBSERVE_LOCKED')")
     fun unlocks(): Flow<List<Long>>
     @Query("SELECT * FROM sessions ORDER BY start") suspend fun allSessions(): List<SessionRow>
     @Query("SELECT * FROM spans ORDER BY start") suspend fun allSpans(): List<SpanRow>
@@ -43,6 +43,7 @@ interface TickDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putConfig(rows: List<ConfigRow>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putCoverage(rows: List<CoverageRow>)
     @Query("DELETE FROM events WHERE time >= :from AND time < :to") suspend fun deleteEvents(from: Long, to: Long)
+    @Query("DELETE FROM events WHERE time >= :from AND time < :to AND kind NOT LIKE 'OBSERVE_%'") suspend fun deleteSystemEvents(from: Long, to: Long)
     @Query("DELETE FROM sessions") suspend fun deleteSessions()
     @Query("DELETE FROM spans") suspend fun deleteSpans()
     @Query("DELETE FROM annotations WHERE id = :id") suspend fun deleteAnnotation(id: String)

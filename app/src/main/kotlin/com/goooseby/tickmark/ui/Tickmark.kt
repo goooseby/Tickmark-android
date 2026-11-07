@@ -78,10 +78,11 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     val error by repo.message.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val updates = remember { (repo.context.applicationContext as TickmarkApp).updates }
     val lifecycle = LocalLifecycleOwner.current
     var access by remember { mutableStateOf(repo.hasAccess()) }
     DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { access = repo.hasAccess(); vm.sync() } }
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { access = repo.hasAccess(); vm.sync(); scope.launch { updates.check(automatic=true) } } }
         lifecycle.lifecycle.addObserver(observer)
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
     }
@@ -91,12 +92,16 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     val date = LocalDate.parse(dateString)
     var rangeStart by rememberSaveable(dateString) { mutableStateOf<Long?>(null) }
     var rangeEnd by rememberSaveable(dateString) { mutableStateOf<Long?>(null) }
+    var settingsRoute by rememberSaveable { mutableStateOf<String?>(null) }
+    var settingsFromTab by rememberSaveable { mutableIntStateOf(2) }
+    fun openSettings(route:String) { settingsFromTab=tab; settingsRoute=route; tab=2 }
     var detail by rememberSaveable { mutableStateOf<String?>(null) }
     var parentDetail by rememberSaveable { mutableStateOf<String?>(null) }
     var weekReturnAnchor by rememberSaveable { mutableStateOf<String?>(null) }
     var weekReturnDetail by rememberSaveable { mutableStateOf<String?>(null) }
     fun back() {
-        if(parentDetail!=null) { detail=parentDetail; parentDetail=null }
+        if(settingsRoute!=null) { if(settingsRoute!!.startsWith("app:")) settingsRoute="apps" else { settingsRoute=null; tab=settingsFromTab } }
+        else if(parentDetail!=null) { detail=parentDetail; parentDetail=null }
         else if(weekReturnAnchor!=null) {
             dateString=weekReturnAnchor!!; detail=weekReturnDetail; reviewWeek=true
             rangeStart=null; rangeEnd=null; weekReturnAnchor=null; weekReturnDetail=null
@@ -133,24 +138,25 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
             transfer.parse(text)
         } }
     }
-    BackHandler(detail != null || rangeStart != null || tab != 0) {
-        when { detail != null || weekReturnAnchor!=null -> back(); rangeStart != null -> { rangeStart = null; rangeEnd = null }; else -> tab = 0 }
+    BackHandler(settingsRoute!=null || detail != null || rangeStart != null || tab != 0) {
+        when { settingsRoute!=null || detail != null || weekReturnAnchor!=null -> back(); rangeStart != null -> { rangeStart = null; rangeEnd = null }; else -> tab = 0 }
     }
-    val colors = if (isSystemInDarkTheme()) darkColorScheme(primary = Color(0xFFADC6FF)) else lightColorScheme(primary = Color(0xFF315DA8), secondary = Color(0xFF53627C), surface = Color(0xFFF9F9FF))
+    val dark = when(records.config["theme"]) { "light"->false; "dark"->true; else->isSystemInDarkTheme() }
+    val colors = if (dark) darkColorScheme(primary = Color(0xFFADC6FF)) else lightColorScheme(primary = Color(0xFF315DA8), secondary = Color(0xFF53627C), surface = Color(0xFFF9F9FF))
     MaterialTheme(colorScheme = colors) {
         val weekly = tab == 1 && reviewWeek && rangeStart == null
         val weekBounds = ReportEngine.weekBoundaries(date,ZoneId.systemDefault())
         val from = rangeStart ?: if(weekly) weekBounds.first() else dayStart(date)
         val to = minOf(rangeEnd ?: if(weekly) weekBounds.last() else dayStart(date.plusDays(1)), System.currentTimeMillis())
         val selected = records.sessions.filter { it.start < to && it.end > from }
-        val title = when { detail == "@range" -> "时段复盘"; detail != null -> appName(detail!!, records); tab == 0 -> if (date == LocalDate.now()) "今日" else "每日概览"; tab == 1 -> "回顾"; else -> "设置" }
+        val title = when { settingsRoute!=null -> when { settingsRoute!!.startsWith("app:")->records.apps.find{it.pkg==settingsRoute!!.removePrefix("app:")}?.name ?: "应用设置"; else->mapOf("apps" to "应用管理","goals" to "每日目标","appearance" to "外观","capture" to "采集状态","data" to "数据管理","updates" to "版本与更新","privacy" to "隐私说明","project" to "项目与反馈")[settingsRoute] ?: "设置" }; detail=="@journal"->"每日复盘"; detail == "@range" -> "时段复盘"; detail != null -> appName(detail!!, records); tab == 0 -> if (date == LocalDate.now()) "今日" else "每日概览"; tab == 1 -> "回顾"; else -> "设置" }
         Scaffold(
             topBar = { TopAppBar(title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = {
-                if (detail != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回") }
+                if (settingsRoute!=null || detail != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回") }
             }, actions = {
                 if (tab != 2 && detail == null) IconButton(onClick = { vm.sync() }, enabled = !syncing) { Icon(Icons.Outlined.Refresh, "刷新") }
             }) },
-            bottomBar = { if (detail == null) NavigationBar {
+            bottomBar = { if (settingsRoute==null && detail == null) NavigationBar {
                 listOf("今日", "回顾", "设置").forEachIndexed { i, label -> NavigationBarItem(selected = tab == i, onClick = { tab = i; weekReturnAnchor=null; weekReturnDetail=null }, icon = { Icon(when(i) { 0 -> Icons.Outlined.Today; 1 -> Icons.Outlined.BarChart; else -> Icons.Outlined.Settings }, null) }, label = { Text(label) }) }
             } }, snackbarHost = { SnackbarHost(snack) }
         ) { padding ->
@@ -163,11 +169,23 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
                 }
                 if (paused && tab != 2) TextButton(onClick = { task { repo.setPaused(false); vm.sync() } }, modifier = Modifier.fillMaxWidth()) { Text("采集已暂停 · 点此继续") }
                 when {
+                    settingsRoute!=null -> when(val route=settingsRoute!!) {
+                        "apps" -> AppManager(records) { settingsRoute="app:${it.pkg}" }
+                        "goals" -> GoalSettings(records) { value->task { repo.setConfig("dailyGoalMinutes" to value) } }
+                        "appearance" -> AppearanceSettings(records.config["theme"] ?: "system") { value->task { repo.setConfig("theme" to value) } }
+                        "capture" -> CaptureSettings(records,access,onPermission={ context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },onPaused={ task {repo.setPaused(it);if(!it) vm.sync()} },onRefresh={vm.sync()})
+                        "privacy" -> PrivacySettings()
+                        "updates" -> UpdateScreen(updates)
+                        "project" -> ProjectSettings()
+                        "data" -> {
+                            val bytes by produceState(0L,records.config["lastSync"]) { value=withContext(Dispatchers.IO) { val db=context.getDatabasePath("tickmark.db");db.length()+java.io.File(db.path+"-wal").length() } }
+                            DataSettings(bytes,null,onBackup={exportJson.launch("Tickmark-${LocalDate.now()}.json")},onExport={exportCsv.launch("Tickmark-sessions-${LocalDate.now()}.csv")},onRestore={importJson.launch(arrayOf("application/json","text/plain","application/octet-stream"))},onClear={clear=true})
+                        }
+                        else -> records.apps.find{it.pkg==route.removePrefix("app:")}?.let { app->AppPreferences(app,records.config,onUpdate={task{repo.updateApp(it)}},onSaveGoal={value->task{repo.setConfig("appGoal:${app.pkg}" to value)}}) }
+                    }
+                    detail=="@journal" -> DailyReflection(records,date) { good,change,next->task{repo.setConfig("review:$date:good" to good,"review:$date:change" to change,"review:$date:next" to next)} }
                     detail != null -> DetailReports(detail!!, records, selected, from, to, onApp = { parentDetail = detail; detail = it }, onAnnotate = { annotation = AnnotationRow(UUID.randomUUID().toString(), from, to, "", "") }, onEdit = { annotation = it }, onUpdateApp = { task { repo.updateApp(it) } }, onDate = { if(weekly) { weekReturnAnchor=dateString; weekReturnDetail=detail }; dateString = it.toString(); reviewWeek = false; rangeStart = null; rangeEnd = null }, weekly = weekly)
-                    tab == 2 -> SettingsPage(records, access, paused,
-                        onPermission = { context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) }, onPaused = { task { repo.setPaused(it); if (!it) vm.sync() } },
-                        onBackup = { exportJson.launch("Tickmark-${LocalDate.now()}.json") }, onExport = { exportCsv.launch("Tickmark-sessions-${LocalDate.now()}.csv") },
-                        onRestore = { importJson.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }, onClear = { clear = true }, onApp = { detail = it.pkg })
+                    tab == 2 -> SettingsHome(records,access,::openSettings)
                     else -> {
                         if(tab==1) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=4.dp)) {
                             listOf("日","周").forEachIndexed { index,label -> SegmentedButton(selected=reviewWeek==(index==1),onClick={ reviewWeek=index==1; rangeStart=null; rangeEnd=null },shape=SegmentedButtonDefaults.itemShape(index,2)) { Text(label) } }
@@ -176,7 +194,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
                         if (tab == 0) TodayReports(records, date, from, to, rangeStart != null,
                             onHour = { hour -> val z = ZoneId.systemDefault(); rangeStart = date.atTime(hour,0).atZone(z).toInstant().toEpochMilli(); rangeEnd = date.atTime(hour,0).plusHours(1).atZone(z).toInstant().toEpochMilli() },
                             onClearRange = { rangeStart = null; rangeEnd = null }, onRange = { showRange = true }, onDetail = { detail = "@range" },
-                            onApp = { s -> detail = s.pkg }, onEdit = { annotation = it })
+                            onApp = { s -> detail = s.pkg }, onEdit = { annotation = it }, onGoal={openSettings("goals")},onJournal={detail="@journal"})
                         else if(reviewWeek) WeeklyReports(records,date,onApp={ detail=it },onDay={ weekReturnAnchor=dateString; weekReturnDetail=null; dateString=it.toString(); reviewWeek=false; rangeStart=null; rangeEnd=null },onRange={ a,b -> weekReturnAnchor=dateString; weekReturnDetail=null; dateString=Instant.ofEpochMilli(a).atZone(ZoneId.systemDefault()).toLocalDate().toString(); reviewWeek=false; rangeStart=a; rangeEnd=b; detail="@range" })
                         else ReviewReports(records, date, from, to, onApp = { detail = it }, onRange = { showRange = true }, onDate = { dateString = it.toString(); rangeStart = null; rangeEnd = null })
                     }
@@ -219,9 +237,8 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
         Metric("手机使用", duration(known), Modifier.weight(1.3f))
         Metric(if(records.config["screenOnly"]=="true") "亮屏次数" else "解锁次数", "${if(records.config["screenOnly"]=="true") rounds.count { it.start>=from } else records.unlocks.count { it >= from && it < to }}", Modifier.weight(0.8f))
         Metric("最长一轮", duration(rounds.maxOfOrNull { overlap(it.start,it.end,from,to) } ?: 0), Modifier.weight(1.2f))
+        StatisticsInfoButton("手机使用统计说明",deviceStatisticsInfo(records,from,to))
     }
-    if (inferred > 0) Text("另有 ${duration(inferred)}应用记录待确认屏幕状态", Modifier.padding(horizontal = 20.dp, vertical = 4.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    if(records.config["screenOnly"]=="true") Text("未设置安全锁屏，按屏幕可交互时间统计",Modifier.padding(horizontal=20.dp,vertical=4.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
 }
 @Composable internal fun Metric(label: String, value: String, modifier: Modifier) {
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) { Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold) }
@@ -237,29 +254,6 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     ListItem(headlineContent={ Text(appName(s.pkg,records),maxLines=1,overflow=TextOverflow.Ellipsis) }, supportingContent={ Text("${clock(maxOf(s.start,from))} – ${clock(minOf(s.end,to))}${if(s.ongoing) " · 进行中" else ""}${if(s.inferred) " · 推算" else ""}${if(purpose.isNotBlank()) " · $purpose" else ""}",style=MaterialTheme.typography.bodySmall) }, leadingContent={ AppIcon(s.pkg) }, trailingContent={ Text(duration(overlap(s.start,s.end,from,to)),style=MaterialTheme.typography.labelLarge) }, modifier=Modifier.clickable(onClick=onClick))
 }
 @Composable private fun EmptyState(title:String, body:String) { Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) { Text(title,style=MaterialTheme.typography.titleSmall); Text(body,style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) } }
-
-@Composable private fun SettingsPage(records:Records, access:Boolean, paused:Boolean, onPermission:()->Unit, onPaused:(Boolean)->Unit, onBackup:()->Unit, onExport:()->Unit, onRestore:()->Unit, onClear:()->Unit, onApp:(AppRow)->Unit) {
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=20.dp)) {
-        item { Section("采集") }
-        item { ListItem(headlineContent={ Text("使用情况访问权限") },supportingContent={ Text(if(access) "已授权" else "未授权，历史记录仍可查看") },trailingContent={ Icon(Icons.Outlined.OpenInNew,null) },modifier=Modifier.clickable(onClick=onPermission)) }
-        item { ListItem(headlineContent={ Text("自动采集") },supportingContent={ Text("打开时刷新，后台约每小时补采") },trailingContent={ Switch(!paused,onCheckedChange={ onPaused(!it) }) }) }
-        item { ListItem(headlineContent={ Text("最后成功同步") },supportingContent={ Text(records.config["lastSync"]?.toLongOrNull()?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")) } ?: "尚未同步") }) }
-        item { Section("数据") }
-        item { SettingAction("保存 JSON 备份","包含使用轨迹、标注和设置",Icons.Outlined.Save,onBackup) }
-        item { SettingAction("导出 CSV 会话表","包含应用与使用时间",Icons.Outlined.TableChart,onExport) }
-        item { SettingAction("从备份恢复","预览后替换当前数据",Icons.Outlined.Restore,onRestore) }
-        item { SettingAction("清空数据","删除记录并选择是否继续采集",Icons.Outlined.DeleteOutline,onClear) }
-        item { Text("使用记录仅保存在本机。导出文件包含应用使用轨迹，请妥善保管。",Modifier.padding(horizontal=20.dp,vertical=8.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
-        if(records.apps.isNotEmpty()) {
-            item { Section("应用分类与隐私") }
-            items(records.apps.sortedBy { it.name },key={ it.pkg }) { app -> ListItem(headlineContent={ Text(app.name,maxLines=1,overflow=TextOverflow.Ellipsis) },supportingContent={ Text(if(app.excluded) "已排除明细" else if(app.hidden) "排行已隐藏" else app.purpose.ifEmpty { "未分类" }) },leadingContent={ AppIcon(app.pkg) },modifier=Modifier.clickable { onApp(app) }) }
-        }
-        item { Section("关于") }
-        item { ListItem(headlineContent={ Text("Tickmark 0.1.0") },supportingContent={ Text("统计时区：${ZoneId.systemDefault().id}") }) }
-    }
-}
-@Composable private fun Section(title:String) { Text(title,Modifier.padding(start=20.dp,top=20.dp,bottom=8.dp),color=MaterialTheme.colorScheme.primary,style=MaterialTheme.typography.labelLarge) }
-@Composable private fun SettingAction(title:String, subtitle:String, icon:androidx.compose.ui.graphics.vector.ImageVector, onClick:()->Unit) { ListItem(headlineContent={ Text(title) },supportingContent={ Text(subtitle) },leadingContent={ Icon(icon,null) },modifier=Modifier.clickable(onClick=onClick)) }
 
 @Composable private fun RangeDialog(date:LocalDate, from:Long, to:Long, onDismiss:()->Unit, onSave:(Long,Long)->Unit) {
     val zone=ZoneId.systemDefault()

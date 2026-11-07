@@ -12,3 +12,5 @@ local-backups/
 build*-log.txt
 docs/validation/*
 !docs/validation/README.md
+**/signing.local.json
+__pycache__/

@@ -48,6 +48,8 @@ private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) =
         item { CompositionChart(records,bounds.first(),until,onApp) }
         item { ChartTitle("一周时段分布") }
         item { WeekHeatmap(records,monday,onSelect=onRange) }
+        item { ChartTitle("整周用途构成") }
+        item { PurposeReport(records,bounds.first(),until) }
         item { Text("已记录日期只表示有状态依据；部分日期可能缺少记录。",Modifier.padding(horizontal=20.dp,vertical=12.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
@@ -61,7 +63,7 @@ private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) =
     val maxValue=maxOf(3_600_000L,values.filterNotNull().maxOrNull() ?: 0)
     val primary=MaterialTheme.colorScheme.primary; val grid=MaterialTheme.colorScheme.outlineVariant
     Column(Modifier.padding(horizontal=20.dp)) {
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration(maxValue),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant); Text(if(pkg==null) "手机使用 · 已确认" else "应用前台 · 含推算",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration(maxValue),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant); Text(if(pkg==null) "手机使用" else "应用用时",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         Canvas(Modifier.fillMaxWidth().height(128.dp).padding(horizontal=8.dp,vertical=10.dp).semantics { contentDescription=dates.zip(values).joinToString("；") { (d,v)->"$d：${if(dayStart(d)>now) "尚未开始" else v?.let { duration(it) } ?: "记录不足"}" } }.pointerInput(monday,values) { detectTapGestures { p -> val i=(p.x/size.width*6).roundToInt().coerceIn(0,6); if(bounds[i]<now) onDay(dates[i]) } }) {
             listOf(0f,.5f,1f).forEach { drawLine(grid,Offset(0f,it*size.height),Offset(size.width,it*size.height),1.dp.toPx()) }
             val points=values.mapIndexed { i,v->v?.let { Offset(i*size.width/6,size.height-it.toFloat()/maxValue*size.height) } }

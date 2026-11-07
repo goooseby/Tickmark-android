@@ -81,7 +81,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
             }
         }
         Row(Modifier.fillMaxWidth().padding(start=24.dp,top=6.dp),horizontalArrangement=Arrangement.SpaceBetween) { listOf("00","06","12","18","24").forEach { Text(it,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant) } }
-        Row(Modifier.padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(18.dp)) { ChartLegend(primary,"已确认"); ChartLegend(estimateColor,"推算") }
+        if(estimated.any {it.duration>0}) Row(Modifier.padding(top=10.dp),horizontalArrangement=Arrangement.spacedBy(18.dp)) { ChartLegend(primary,"使用时长"); ChartLegend(estimateColor,"估算") }
     }
 }
 
@@ -102,6 +102,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
     var allApps by remember(from,to) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().height(180.dp),contentAlignment=Alignment.Center) {
+            StatisticsInfoButton("应用构成统计说明",APP_COMPOSITION_INFO,Modifier.align(Alignment.TopEnd))
             Canvas(Modifier.size(164.dp).semantics { contentDescription="应用前台时长构成：$description" }.pointerInput(shown) { detectTapGestures { point ->
                 val dx=point.x-size.width/2; val dy=point.y-size.height/2
                 val radius=hypot(dx,dy)
@@ -135,7 +136,6 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
                 }
             }
         }
-        Text("按应用前台时长计算，含推算；并发应用分别计时。",Modifier.padding(horizontal=20.dp,vertical=6.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -150,7 +150,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
     val maxValue=maxOf(3_600_000L,values.filterNotNull().maxOrNull() ?: 0)
     val primary=MaterialTheme.colorScheme.primary; val grid=MaterialTheme.colorScheme.outlineVariant
     Column(Modifier.padding(horizontal=20.dp)) {
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration(maxValue),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant); Text(if(pkg==null) "手机使用 · 已确认" else "应用前台 · 含推算",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { Text(duration(maxValue),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant); Text(if(pkg==null) "手机使用" else "应用用时",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         Canvas(Modifier.fillMaxWidth().height(120.dp).padding(vertical=10.dp).semantics { contentDescription=dates.zip(values).joinToString("；") { (d,v)->"$d：${v?.let { duration(it) } ?: "记录不足"}" } }.pointerInput(dates) { detectTapGestures { p -> onDate(dates[(p.x/size.width*6).roundToInt().coerceIn(0,6)]) } }) {
             listOf(0f,.5f,1f).forEach { drawLine(grid,Offset(0f,size.height*it),Offset(size.width,size.height*it),1.dp.toPx()) }
             val points=values.mapIndexed { i,v -> v?.let { Offset(i*size.width/6,size.height-it.toFloat()/maxValue*size.height) } }

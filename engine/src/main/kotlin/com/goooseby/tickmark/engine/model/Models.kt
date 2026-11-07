@@ -1,6 +1,6 @@
 package com.goooseby.tickmark.engine.model
 
-enum class EventKind { RESUME, PAUSE, STOP, SCREEN_ON, SCREEN_OFF, UNLOCK, LOCK, STARTUP, SHUTDOWN }
+enum class EventKind { RESUME, PAUSE, STOP, SCREEN_ON, SCREEN_OFF, UNLOCK, LOCK, STARTUP, SHUTDOWN, OBSERVE_BOOT, OBSERVE_SCREEN_ON, OBSERVE_SCREEN_OFF, OBSERVE_UNLOCKED, OBSERVE_LOCKED }
 
 data class UsageEvent(val time: Long, val kind: EventKind, val packageName: String = "", val activity: String = "", val instance: Int = 0)
 data class Session(val packageName: String, val start: Long, val end: Long, val inferred: Boolean = false, val ongoing: Boolean = false) {
