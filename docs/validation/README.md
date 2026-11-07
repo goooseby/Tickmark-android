@@ -11,6 +11,7 @@
 | 静态检查 | 0 errors、25 warnings；主要为已有依赖更新提示、KAPT建议及KTX风格提示，没有通过关闭检查规避错误 |
 | 实际事件回放 | 当前日应用推算从约71分钟降至0；开机前缺失状态保留空档，未算作手机使用；见 docs/09-capture-diagnosis.md |
 | 正式签名 | 本地持久密钥构建成功，apksigner校验通过（v2）；密钥不进入Git，发布Secrets已配置 |
+| 云端验证 | GitHub Actions Verify Android 通过；Prepare signed release 通过，生成0.2.0草稿、正式签名APK、SHA256SUMS和版本清单 |
 | 更新网络边界 | 只访问GitHub版本/安装包，自动检查默认关闭；无账号、遥测和使用记录上传 |
 | 真机 | 尚未连接真机，厂商后台、锁屏与分屏仍需核对 |
 
@@ -19,3 +20,5 @@
 正式覆盖安装需同一证书的两个递增版本；不能把调试包安装当作正式更新链路通过。当前已验证发布响应、校验/拒绝边界与正式签名产物；真实GitHub尚无正式Release时返回“尚无正式发布版本”。正式下载后覆盖安装仍需首次正式发布后验证。
 
 原始轨迹、数据库、截图、测试输出与本地签名配置均忽略提交。产品待完成项和设备限制见 docs/05-delivery.md。
+
+云端记录：[构建与静态检查](https://github.com/goooseby/Tickmark-android/actions/runs/42401913387)、[签名与草稿发布](https://github.com/goooseby/Tickmark-android/actions/runs/42401918181)。实际更新页访问GitHub后显示“尚无正式发布版本”；草稿不进入默认更新渠道。签名构建与草稿生成通过不等于已验证正式渠道覆盖安装。
