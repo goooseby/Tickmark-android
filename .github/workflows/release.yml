@@ -12,6 +12,9 @@ on:
         default: '2'
 permissions:
   contents: read
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
 jobs:
   release:
     runs-on: ubuntu-latest
