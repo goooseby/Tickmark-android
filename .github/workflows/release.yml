@@ -49,7 +49,12 @@ jobs:
           sha256sum "tickmark-v$VERSION.apk" > SHA256SUMS.txt
           python -c 'import json,os; json.dump({"versionName":os.environ["VERSION"],"versionCode":int(os.environ["VERSION_CODE"])},open("update.json","w"))'
       - name: Create draft with release notes
-        run: gh release create "v$VERSION" release/* --target "$GITHUB_SHA" --title "Tickmark $VERSION" --generate-notes --draft
+        run: |
+          if [ -f "docs/releases/$VERSION.md" ]; then
+            gh release create "v$VERSION" release/* --target "$GITHUB_SHA" --title "Tickmark $VERSION" --notes-file "docs/releases/$VERSION.md" --draft
+          else
+            gh release create "v$VERSION" release/* --target "$GITHUB_SHA" --title "Tickmark $VERSION" --generate-notes --draft
+          fi
       - name: Remove signing key
         if: always()
         run: rm -f "$TICKMARK_KEYSTORE_PATH"

@@ -122,11 +122,11 @@ import java.time.format.DateTimeFormatter
                 if(state.downloading) { if(state.progress!=null) LinearProgressIndicator(progress={state.progress!!/100f},modifier=Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth()); TextButton(onClick={scope.launch {controller.cancel()}}) {Text("取消下载${state.progress?.let {" · $it%"} ?: ""}")} }
                 else if(state.ready) Button(onClick={scope.launch {controller.install()}}) {Text("安装更新")}
                 else if(release.apk!=null && release.digest!=null) Button(onClick={scope.launch {controller.download()}}) {Text("下载安装包 · ${"%.1f".format(release.bytes/1_048_576.0)} MB")}
-                else Text("此发布未提供可校验安装包，请打开发布页查看。",style=MaterialTheme.typography.bodyMedium)
+                else Text("此版本暂不支持应用内下载，请打开发布页查看。",style=MaterialTheme.typography.bodyMedium)
             }
         }
         item { HorizontalDivider();ListItem(headlineContent={Text("自动检查更新")},supportingContent={Text("打开应用时检查，每天最多一次，不自动下载")},trailingContent={Switch(state.autoCheck,controller::setAuto)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surface)) }
-        item { Text("下载后检查文件摘要、包名、版本和签名，再交给系统安装。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+        item { Text("安装由系统确认，更新会保留本地记录。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
 @Composable internal fun ProjectSettings() {
