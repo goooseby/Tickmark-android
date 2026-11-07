@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+.idea/
+**/build/
+local.properties
+*.iml
+*.jks
+*.keystore
+captures/
+private-diagnostics/
+local-backups/
+build*-log.txt
+docs/validation/*
+!docs/validation/README.md
