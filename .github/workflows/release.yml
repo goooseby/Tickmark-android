@@ -22,7 +22,7 @@ jobs:
       VERSION_CODE: ${{ inputs.version_code }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
-      TICKMARK_KEYSTORE_PATH: ${{ runner.temp }}/tickmark-release.jks
+      TICKMARK_KEYSTORE_PATH: /tmp/tickmark-release.jks
       TICKMARK_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
       TICKMARK_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       TICKMARK_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
