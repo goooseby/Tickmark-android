@@ -142,6 +142,14 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
         when { settingsRoute!=null || detail != null || weekReturnAnchor!=null -> back(); rangeStart != null -> { rangeStart = null; rangeEnd = null }; else -> tab = 0 }
     }
     val dark = when(records.config["theme"]) { "light"->false; "dark"->true; else->isSystemInDarkTheme() }
+    SideEffect {
+        (context as? android.app.Activity)?.window?.let { window ->
+            androidx.core.view.WindowCompat.getInsetsController(window,window.decorView).apply {
+                isAppearanceLightStatusBars=!dark
+                isAppearanceLightNavigationBars=!dark
+            }
+        }
+    }
     val colors = if (dark) darkColorScheme(primary = Color(0xFFADC6FF)) else lightColorScheme(primary = Color(0xFF315DA8), secondary = Color(0xFF53627C), surface = Color(0xFFF9F9FF))
     MaterialTheme(colorScheme = colors) {
         val weekly = tab == 1 && reviewWeek && rangeStart == null
