@@ -28,8 +28,11 @@ GitHub Actions 检查构建与算法测试；手动发布工作流接收版本�
 
 ## 验证范围
 
-版本大小比较、发布源与安装包选择、摘要失败、旧版本拒绝、页面状态与错误状态由测试覆盖。真实 GitHub 尚无正式 Release 时应显示“尚无正式发布版本”。完整正式渠道覆盖安装需要同一证书签名的两个递增版本，不能用调试包的安装结果冒充正式渠道验证。
+版本大小比较、发布源与安装包选择、摘要失败、旧版本拒绝、页面状态与错误状态由测试覆盖。GitHub 尚无正式 Release 时应显示“尚无正式发布版本”。完整正式渠道覆盖安装需要同一证书签名的两个递增版本，不能用调试包的安装结果冒充正式渠道验证。
 
 依据：[GitHub Releases API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)、[DownloadManager](https://developer.android.com/reference/android/app/DownloadManager)、[FileProvider](https://developer.android.com/reference/androidx/core/content/FileProvider)。
 
 本机发布密钥保存在 `D:/AndroidDev/Signing/tickmark/`；本机签名构建可运行 `python scripts/build-release.py --signing-config D:/AndroidDev/Signing/tickmark/signing.local.json`。签名配置文件含凭据，已在 Git 忽略规则中排除。GitHub 仓库四项签名 Secrets 已配置，工作流不输出密钥内容。
+
+
+0.4.0已验证API36模拟器中正式0.3.0覆盖升级，旧复盘在新版记录列表保留；签名、包名及版本校验通过。完整应用内下载与系统安装授权交互仍需单独验证，不能将ADB覆盖安装等同于该流程。详见 [发布验证](validation/README.md)。

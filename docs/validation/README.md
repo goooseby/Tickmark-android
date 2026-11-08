@@ -64,3 +64,15 @@
 样例只使用内存数据库；未向正式数据库注入样例。检查后恢复模拟器正常尺寸、字号、浅色及临时输入法设置，临时日志和截图清理，保留其他图标设计任务的输出。
 
 本轮[云端构建、算法与静态检查](https://github.com/goooseby/Tickmark-android/actions/runs/42465096527)通过。软键盘测试先等待输入法会话建立再设置末尾选区，避免初始化选区覆盖测试操作。模拟器中断的测试不计作通过，系统恢复稳定后重新运行。
+
+
+## 0.4.0正式发布（2026-11-08）
+
+经用户明确授权，将版本从0.3.0 / 3调整为0.4.0 / 4，接入已选定的雾蓝日环图标与独立单色层。记录、复盘、行动及应用分类随本次发布；[用户版本说明](../releases/0.4.0.md)保持简短。
+
+- [Verify Android](https://github.com/goooseby/Tickmark-android/actions/runs/42467187698)及[正式签名构建](https://github.com/goooseby/Tickmark-android/actions/runs/42467188601)均通过，包含算法、构建和静态检查。
+- 下载云端APK，核对包名io.github.goooseby.tickmark、版本0.4.0 / 4、APK v2签名及与0.3.0相同的正式证书。SHA-256为bd985f6fe28b320f41234b46189be226a1c0f0267f1f8cfa9ace454b74e4f3f5，与SHA256SUMS和GitHub资产digest一致；update.json也匹配。
+- 使用独立API36模拟器，安装公开0.3.0，实际填写、保存并重新打开旧复盘，随后以正式0.4.0覆盖安装成功；新版记录列表保留旧复盘文字，验证数据库v1→v2→v3的实际升级。检查桌面上新版自适应图标显示正常。该验证使用独立样例，不改变原调试模拟器或用户手机数据。
+- 验证后公开[v0.4.0](https://github.com/goooseby/Tickmark-android/releases/tag/v0.4.0)，latest接口返回该版本，APK、校验文件和更新清单均公开。尚未做真机或完整的应用内下载后系统安装交互验证；这里的覆盖安装通过ADB执行。
+
+临时发布验证模拟器及构建下载输出在检查后移除，长期设计源文件保留在docs/design/。
