@@ -110,8 +110,9 @@ class JournalUiTest {
         val note=JournalRow.note(LocalDate.now()).copy(title="一段需要继续编辑的长记录",body=body)
         runBlocking{repo.saveJournal(note,true)}
         openHub();compose.onNodeWithText(note.title).performClick();waitEditor()
+        compose.onNodeWithText("写下记录").performClick()
+        android.os.SystemClock.sleep(400) // Focus opens an IME session; select only after its initial selection arrives.
         compose.onNodeWithText("写下记录").performTextInputSelection(androidx.compose.ui.text.TextRange(body.length))
-        android.os.SystemClock.sleep(400) // Settle a soft keyboard if this emulator enables it.
         compose.onNodeWithText("写下记录").performTextInput("\n追加一条计划。")
         compose.onNodeWithText("写下记录").assertTextContains("追加一条计划。",substring=true)
         compose.onNodeWithText("完成").assertIsDisplayed()
