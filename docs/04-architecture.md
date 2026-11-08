@@ -2,7 +2,7 @@
 
 ## 1. 工程决策
 
-采用 Kotlin、Compose / Material 3、ViewModel、Coroutines / Flow、Room、DataStore、WorkManager。首版最低版本计划 Android 10 / API 29，优先验证用户现用手机。compileSdk、targetSdk 与依赖版本在构建初始化时根据本机 SDK 和当时稳定版本锁定，统一放入版本目录。
+采用 Kotlin、Compose / Material 3、ViewModel、Coroutines / Flow、Room、DataStore、WorkManager。最低 Android 10 / API 29，compileSdk / targetSdk 为36，构建与依赖版本定义在 Gradle 配置中。
 
 物理结构采用两个模块：Android `app` 与纯 Kotlin/JVM `engine`。这个边界隔离项目最重要的计算逻辑，支持快速离线回放与测试；页面按包组织，后续根据规模再拆模块。
 
@@ -12,17 +12,12 @@
 
 | 目录 | 责任 |
 | --- | --- |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/app` | 应用入口、依赖装配、导航 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/platform/usage` | 系统事件适配、可用能力、权限检查 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/platform/packages` | 应用名称、图标、可见性处理 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/data/local` | Room 实体、DAO、迁移、事务 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/data/repository` | 同步、缓存、查询与数据流 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/data/transfer` | 导出、备份、恢复 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/feature/today` | 日期时间线、选区与标注入口 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/feature/review` | 摘要、排行、趋势 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/feature/appdetail` | 单应用详情 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/feature/settings` | 配置与权限状态 |
-| `app/src/main/kotlin/io/github/goooseby/tickmark/core/ui` | 主题、时间轴、图表、状态组件 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/app` | 应用入口、依赖装配、ViewModel与组件导航入口 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/data` | Room实体与DAO、使用事件采集、应用信息、同步、备份恢复 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/data/report` | 页面和组件共用的事务快照与设备区间投影 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/ui` | Compose页面、日周报表、图表、标注、设置与导航 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/update` | GitHub版本检测、下载、校验与系统安装 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/widget` | Glance桌面组件、图形、快照发布与刷新 |
 | `app/src/main/kotlin/io/github/goooseby/tickmark/worker` | 补采与保留策略执行 |
 | `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/model` | 标准化事件、区间、质量与来源 |
 | `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/session` | 状态机、检查点、会话重建 |

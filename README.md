@@ -25,7 +25,7 @@
 | [状态空档诊断](docs/09-capture-diagnosis.md) | 启动、屏幕与锁屏状态的修复依据 |
 | [组件与未使用时段](docs/10-widgets-and-away.md) | 共享统计投影、桌面设计与更新机制 |
 
-`原始需求说明书.md` 已改写为项目简介，原始输入完整保存在 [初稿归档](docs/archive/initial-prd.md)。正式决策以以上分工文档为准；实现中改变口径时同步更新文档。
+原始输入完整保存在 [初稿归档](docs/archive/initial-prd.md)。正式决策以以上分工文档为准；实现中改变口径时同步更新文档。
 
 ## 目录约定
 
@@ -35,6 +35,9 @@
 | `engine/` | 纯 Kotlin 模块，会话还原与统计计算 |
 | `docs/` | 产品、交互、数据、架构、验收文档 |
 | `docs/archive/` | 初始资料归档 |
+| `scripts/` | 签名构建与发布脚本 |
+
+各模块的 `build/` 是可重新生成的构建产物；临时调试文件统一放在根目录的 `build/diagnostics/`，按需生成，任务结束清理。
 
 applicationId 为 `io.github.goooseby.tickmark`，最低 Android 10 / API 29，当前编译/目标 API 36。第一版按单设备、个人使用设计。
 

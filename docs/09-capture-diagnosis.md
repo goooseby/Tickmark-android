@@ -26,4 +26,4 @@ API 36 模拟器当前日重放后，应用推算时长从此前约71分钟降�
 
 Android 开源实现会在 UsageStats 服务初始化时加入当前时间的 STARTUP，SHUTDOWN 采用最近持久化/事件时间，而非精确的物理开关机时间：[UserUsageStatsService.init](https://android.googlesource.com/platform/frameworks/base/+/6a7ce3a5178d/services/usage/java/com/android/server/usage/UserUsageStatsService.java)。结合本机事件顺序，修复独立状态被错误清空的逻辑。
 
-原始事件已被系统清理、设备时钟大幅跳变或厂商长期不提供事件时，不能无依据补成精确轨迹。时钟变化隔离、设备检查点与真机验证仍需继续完善。原始诊断数据库和设备轨迹仅保存在忽略提交的 private-diagnostics 中，不上传仓库。
+原始事件已被系统清理、设备时钟大幅跳变或厂商长期不提供事件时，不能无依据补成精确轨迹。时钟变化隔离、设备检查点与真机验证仍需继续完善。原始诊断数据库和设备轨迹仅作为本地临时文件存放于忽略提交的 `build/diagnostics/`，验证结束后清理，不上传仓库。
