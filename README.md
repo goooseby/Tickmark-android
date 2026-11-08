@@ -2,7 +2,7 @@
 
 个人 Android 手机使用轨迹与每日复盘工具。名称暂用 Tickmark。
 
-体验安装：[下载0.3.0 APK](https://github.com/goooseby/Tickmark-android/releases/download/v0.3.0/tickmark-v0.3.0.apk) · [版本说明](https://github.com/goooseby/Tickmark-android/releases/tag/v0.3.0)。首次使用请按应用提示开启使用记录访问权限。
+体验安装：[下载0.4.0 APK](https://github.com/goooseby/Tickmark-android/releases/download/v0.4.0/tickmark-v0.4.0.apk) · [版本说明](https://github.com/goooseby/Tickmark-android/releases/tag/v0.4.0)。首次使用请按应用提示开启使用记录访问权限。
 
 核心问题：今天什么时候用了哪些应用、每次用了多久、哪些时段值得回看？
 
