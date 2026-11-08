@@ -108,6 +108,7 @@ class ReportUiTest {
         compose.onNodeWithText("效率办公").performClick()
         compose.waitForIdle()
         runBlocking { Assert.assertEquals("PRODUCTIVITY",repo.dao.allApps().find {it.pkg=="sample.browser"}?.categoryOverride) }
+        screenshot("app-category-settings")
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("每日目标").performClick()
@@ -173,7 +174,7 @@ class ReportUiTest {
         compose.setContent {Tickmark(repo)}
         compose.onNodeWithContentDescription("前一天").performClick()
         compose.onNodeWithText("回顾").performClick()
-        compose.onNodeWithText("日").performClick()
+        compose.onNode(hasText("日") and SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.Role,androidx.compose.ui.semantics.Role.RadioButton)).performClick()
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("影音娱乐"))
         compose.onNodeWithText("影音娱乐").assertIsDisplayed()
         screenshot("category-report")

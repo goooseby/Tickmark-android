@@ -21,7 +21,7 @@
 | `app/src/main/kotlin/io/github/goooseby/tickmark/worker` | 补采与保留策略执行 |
 | `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/model` | 标准化事件、区间、质量与来源 |
 | `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/session` | 状态机、检查点、会话重建 |
-| `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/analytics` | 并集、切分、投影与用途统计 |
+| `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/analytics` | 并集、切分、设备投影与应用分类统计 |
 | `engine/src/test` | 合成序列回放和性质测试 |
 | `app/src/androidTest` | Room 迁移、系统接入与关键操作验证 |
 
