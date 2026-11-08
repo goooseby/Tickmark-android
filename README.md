@@ -20,6 +20,8 @@
 | [平台依据](docs/06-platform-notes.md) | Android 接口事实、参考链接、待验证项 |
 | [功能打磨与建议](docs/07-improvements.md) | 目标、复盘与后续产品优先级 |
 | [更新与发布](docs/08-updates.md) | GitHub 更新、签名与发布流程 |
+| [状态空档诊断](docs/09-capture-diagnosis.md) | 启动、屏幕与锁屏状态的修复依据 |
+| [组件与未使用时段](docs/10-widgets-and-away.md) | 共享统计投影、桌面设计与更新机制 |
 
 `原始需求说明书.md` 已改写为项目简介，原始输入完整保存在 [初稿归档](docs/archive/initial-prd.md)。正式决策以以上分工文档为准；实现中改变口径时同步更新文档。
 

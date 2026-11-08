@@ -22,7 +22,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import com.goooseby.tickmark.BuildConfig
-import com.goooseby.tickmark.app.Records
+import com.goooseby.tickmark.data.report.Records
 import com.goooseby.tickmark.data.AppRow
 import com.goooseby.tickmark.update.*
 import kotlinx.coroutines.delay
@@ -36,6 +36,7 @@ import java.time.format.DateTimeFormatter
         item { SettingsLink("每日目标",records.config["dailyGoalMinutes"]?.toIntOrNull()?.takeIf { it>0 }?.let { "每天 ${duration(it*60_000L)}" } ?: "设置自己合适的用时目标",Icons.Outlined.Flag) { onNavigate("goals") } }
         item { SettingsLink("应用管理","默认用途、排行显示与隐私排除",Icons.Outlined.Apps) { onNavigate("apps") } }
         item { SettingsLink("外观",when(records.config["theme"]) { "light"->"浅色"; "dark"->"深色"; else->"跟随系统" },Icons.Outlined.Palette) { onNavigate("appearance") } }
+        item { SettingsLink("桌面组件","今日用时与未使用时段",Icons.Outlined.Widgets) { onNavigate("widgets") } }
         item { SettingsSection("采集与数据") }
         item { SettingsLink("采集状态",when { !access->"尚未授权"; records.config["paused"]=="true"->"已暂停"; else->"采集中" },Icons.Outlined.QueryStats) { onNavigate("capture") } }
         item { SettingsLink("数据管理","备份、恢复与导出",Icons.Outlined.Storage) { onNavigate("data") } }

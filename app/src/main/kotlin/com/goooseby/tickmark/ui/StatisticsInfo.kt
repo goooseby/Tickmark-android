@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.goooseby.tickmark.app.Records
+import com.goooseby.tickmark.data.report.Records
 import com.goooseby.tickmark.engine.model.overlap
 import com.goooseby.tickmark.engine.model.unionDuration
 import java.time.*
@@ -21,7 +21,7 @@ import java.time.format.DateTimeFormatter
 }
 internal fun deviceStatisticsInfo(records:Records,from:Long,to:Long):String {
     val estimate=unionDuration(records.sessions.filter {it.inferred}.map {maxOf(it.start,from) to minOf(it.end,to)})
-    val unknown=records.spans.filter {it.state=="UNKNOWN"}.sumOf {overlap(it.start,it.end,from,to)}
+    val unknown=records.deviceReport(from,to).unknown
     val first=records.spans.minOfOrNull {it.start}
     return buildString {
         append(if(records.config["screenOnly"]=="true") "这台设备按屏幕亮起且可操作的时间统计。" else "手机使用统计屏幕可操作且已解锁的时间。")

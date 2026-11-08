@@ -11,7 +11,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import com.goooseby.tickmark.app.Records
+import com.goooseby.tickmark.data.report.Records
 import com.goooseby.tickmark.engine.analytics.*
 import com.goooseby.tickmark.engine.model.Session
 import com.goooseby.tickmark.engine.model.overlap
@@ -33,7 +33,7 @@ import java.time.LocalDate
 @Composable internal fun GoalProgress(records:Records,date:LocalDate,onEdit:()->Unit) {
     val goal=records.config["dailyGoalMinutes"]?.toLongOrNull()?.takeIf {it>0} ?: return
     val start=dayStart(date);val end=minOf(dayStart(date.plusDays(1)),System.currentTimeMillis())
-    val used=records.spans.filter{it.state=="IN_USE"}.sumOf {overlap(it.start,it.end,start,end)}
+    val used=records.dayReport(date).used
     Column(Modifier.padding(horizontal=20.dp,vertical=6.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text("每日目标",style=MaterialTheme.typography.labelLarge);TextButton(onClick=onEdit,contentPadding=PaddingValues(horizontal=8.dp)) {Text("${duration(used)} / ${duration(goal*60_000)}")} }
         LinearProgressIndicator(progress={(used.toFloat()/(goal*60_000)).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth(),color=if(used>goal*60_000) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.primary,drawStopIndicator={})
@@ -64,7 +64,7 @@ import java.time.LocalDate
 }
 @Composable internal fun PurposeReport(records:Records,from:Long,to:Long) {
     val totals=remember(records.sessions,records.spans,records.annotations,records.apps,from,to) {
-        PurposeEngine.totals(records.sessions.map {Session(it.pkg,it.start,it.end,it.inferred,it.ongoing)},records.spans.filter{it.state=="IN_USE"}.map{it.start to it.end},records.annotations.map{PurposeRange(it.start,it.end,it.purpose)},records.apps.associate{it.pkg to it.purpose},from,to)
+        PurposeEngine.totals(records.sessions.map {Session(it.pkg,it.start,it.end,it.inferred,it.ongoing)},records.deviceReport(from,to).spans.filter{it.state==com.goooseby.tickmark.engine.model.DeviceState.IN_USE}.map{it.start to it.end},records.annotations.map{PurposeRange(it.start,it.end,it.purpose)},records.apps.associate{it.pkg to it.purpose},from,to)
     }
     if(totals.isEmpty()) {EmptyReport("暂无可分类的手机用时");return}
     Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {

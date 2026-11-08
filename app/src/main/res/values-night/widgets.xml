@@ -1,0 +1,12 @@
+<resources>
+    <color name="widget_today_background">#1A283E</color>
+    <color name="widget_today_ink">#E3ECFA</color>
+    <color name="widget_today_secondary">#A7B8D0</color>
+    <color name="widget_today_accent">#AAC9FF</color>
+    <color name="widget_today_track">#354764</color>
+    <color name="widget_away_background">#1D3028</color>
+    <color name="widget_away_ink">#E0F0E3</color>
+    <color name="widget_away_secondary">#A6C1AE</color>
+    <color name="widget_away_accent">#A2D4AE</color>
+    <color name="widget_away_track">#3D5848</color>
+</resources>

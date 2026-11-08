@@ -16,14 +16,14 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import com.goooseby.tickmark.app.Records
+import com.goooseby.tickmark.data.report.Records
 import com.goooseby.tickmark.engine.analytics.ReportEngine
 import com.goooseby.tickmark.engine.model.unionDuration
 import java.time.*
 import kotlin.math.roundToInt
 
-private fun reportIntervals(records:Records,pkg:String?) = if(pkg==null) records.spans.filter { it.state=="IN_USE" }.map { it.start to it.end } else records.sessions.filter { it.pkg==pkg }.map { it.start to it.end }
-private fun hasEvidence(records:Records,from:Long,to:Long,pkg:String?) = records.spans.any { it.state!="UNKNOWN" && it.start<to && it.end>from } || (pkg!=null && records.sessions.any { it.pkg==pkg && it.start<to && it.end>from })
+private fun reportIntervals(records:Records,pkg:String?) = if(pkg==null) records.deviceSpans.filter { it.state==com.goooseby.tickmark.engine.model.DeviceState.IN_USE }.map { it.start to it.end } else records.sessions.filter { it.pkg==pkg }.map { it.start to it.end }
+private fun hasEvidence(records:Records,from:Long,to:Long,pkg:String?) = records.deviceSpans.any { it.state!=com.goooseby.tickmark.engine.model.DeviceState.UNKNOWN && it.start<to && it.end>from } || (pkg!=null && records.sessions.any { it.pkg==pkg && it.start<to && it.end>from })
 private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) = unionDuration(intervals.map { maxOf(it.first,from) to minOf(it.second,to) })
 
 @Composable internal fun WeeklyReports(records:Records,date:LocalDate,onApp:(String)->Unit,onDay:(LocalDate)->Unit,onRange:(Long,Long)->Unit) {

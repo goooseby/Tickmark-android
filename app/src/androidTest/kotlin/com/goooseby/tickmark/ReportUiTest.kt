@@ -62,6 +62,7 @@ class ReportUiTest {
         compose.setContent { Tickmark(repo) }
         compose.onNodeWithContentDescription("前一天").performClick()
         compose.onNodeWithText("每小时使用").assertIsDisplayed()
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("全天应用构成"))
         compose.onNodeWithText("全天应用构成").assertExists()
         compose.onNodeWithText("查看原始会话").assertDoesNotExist()
         screenshot("reports-sample-light")
@@ -128,5 +129,35 @@ class ReportUiTest {
         compose.onNodeWithText("保存复盘").performClick()
         compose.waitForIdle()
         runBlocking { Assert.assertEquals("睡前先读十页",repo.dao.allConfig().find{it.key=="review:${LocalDate.now()}:next"}?.value) }
+    }
+    @Test fun awayEntryFiltersPresentationAndSavesAnnotationWithoutChangingTotals() {
+        val date=LocalDate.now().minusDays(1)
+        val start=date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        runBlocking {
+            repo.dao.putSpans(listOf(SpanRow(start,start+3_600_000,"SCREEN_OFF"),
+                SpanRow(start+3_600_000,start+5_400_000,"LOCKED"),
+                SpanRow(start+6_000_000,start+6_120_000,"SCREEN_OFF")))
+        }
+        compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
+        compose.setContent { Tickmark(repo,com.goooseby.tickmark.app.ReportEntry("away",date)) }
+        compose.onNodeWithText("未使用时段").assertIsDisplayed()
+        compose.onAllNodesWithText("1小时32分").assertCountEquals(1)
+        compose.onAllNodesWithText("2分钟").assertCountEquals(0)
+        screenshot("away-sample")
+        compose.onNodeWithText("至少5分钟").performClick()
+        compose.onNodeWithText("2分钟").assertIsDisplayed()
+        compose.onAllNodesWithText("1小时32分").assertCountEquals(1)
+        compose.onNode(hasText("1小时30分") and hasClickAction()).performScrollTo().performClick()
+        compose.onNodeWithText("时段标注").assertExists()
+        compose.onNodeWithText("学习").performClick()
+        compose.onNodeWithText("保存").performClick()
+        compose.waitForIdle()
+        runBlocking {
+            val note=repo.dao.allAnnotations().single()
+            Assert.assertEquals(start,note.start);Assert.assertEquals(start+5_400_000,note.end)
+            Assert.assertEquals("学习",note.purpose)
+        }
+        compose.onNodeWithContentDescription("返回").performClick()
+        compose.onNodeWithText("每日概览").assertIsDisplayed()
     }
 }

@@ -16,6 +16,11 @@ import com.goooseby.tickmark.engine.model.*
 import com.goooseby.tickmark.engine.session.SessionEngine
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.distinctUntilChanged
+import com.goooseby.tickmark.data.report.Records
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -28,6 +33,16 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
     private val mutex = Mutex()
     val syncing = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
+    val records: Flow<Records> = db.invalidationTracker.createFlow(
+        "sessions","spans","annotations","metadata","coverage","config","events",emitInitialState=true
+    ).map { snapshot() }.distinctUntilChanged().flowOn(Dispatchers.IO)
+
+    suspend fun snapshot(): Records = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            Records(dao.allSessions(),dao.allSpans(),dao.allAnnotations(),dao.allApps(),dao.allCoverage(),
+                dao.allConfig().associate { it.key to it.value },dao.allUnlocks())
+        }
+    }
     fun hasAccess(): Boolean = context.getSystemService(AppOpsManager::class.java)
         .checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
 

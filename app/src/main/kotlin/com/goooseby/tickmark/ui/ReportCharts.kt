@@ -20,7 +20,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.goooseby.tickmark.app.Records
+import com.goooseby.tickmark.data.report.Records
 import com.goooseby.tickmark.data.SessionRow
 import com.goooseby.tickmark.engine.analytics.ReportEngine
 import com.goooseby.tickmark.engine.model.Session
@@ -37,7 +37,7 @@ internal fun visibleSessions(records:Records) = records.sessions.filter { it.pkg
 internal fun hourBoundaries(date:LocalDate):List<Long> {
     val start=date.atStartOfDay(ZoneId.systemDefault())
     val end=date.plusDays(1).atStartOfDay(ZoneId.systemDefault())
-    return generateSequence(start) { it.plusHours(1) }.takeWhile { it <= end }.map { it.toInstant().toEpochMilli() }.toList()
+    return generateSequence(start) { it.plusHours(1) }.takeWhile { it < end }.map { it.toInstant().toEpochMilli() }.toList()+end.toInstant().toEpochMilli()
 }
 
 @Composable internal fun ChartTitle(title:String, trailing:String?=null, onClick:()->Unit={}) {
@@ -50,7 +50,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
 /** Device minutes are a union; inferred app minutes occupy a separate series. */
 @Composable internal fun HourlyChart(records:Records, date:LocalDate, pkg:String?=null, selectedHour:Int?=null, onSelect:(Long,Long)->Unit) {
     val boundaries=hourBoundaries(date)
-    val observed=if(pkg==null) records.spans.filter { it.state=="IN_USE" }.map { it.start to it.end }
+    val observed=if(pkg==null) records.dayReport(date).spans.filter { it.state==com.goooseby.tickmark.engine.model.DeviceState.IN_USE }.map { it.start to it.end }
         else records.sessions.filter { it.pkg==pkg && !it.inferred }.map { it.start to it.end }
     val inferred=records.sessions.filter { it.inferred && (pkg==null || it.pkg==pkg) }.map { it.start to it.end }
     val known=ReportEngine.buckets(observed,boundaries)
@@ -143,8 +143,8 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
     val dates=(6 downTo 0).map { date.minusDays(it.toLong()) }
     val values=dates.map { d ->
         val from=hourBoundaries(d).first(); val to=minOf(hourBoundaries(d).last(),System.currentTimeMillis())
-        val intervals=if(pkg!=null) records.sessions.filter { it.pkg==pkg }.map { it.start to it.end } else records.spans.filter { it.state=="IN_USE" }.map { it.start to it.end }
-        val hasEvidence=records.spans.any { it.state!="UNKNOWN" && it.start<to && it.end>from } || (pkg!=null && records.sessions.any { it.pkg==pkg && it.start<to && it.end>from })
+        val intervals=if(pkg!=null) records.sessions.filter { it.pkg==pkg }.map { it.start to it.end } else records.deviceSpans.filter { it.state==com.goooseby.tickmark.engine.model.DeviceState.IN_USE }.map { it.start to it.end }
+        val hasEvidence=records.deviceSpans.any { it.state!=com.goooseby.tickmark.engine.model.DeviceState.UNKNOWN && it.start<to && it.end>from } || (pkg!=null && records.sessions.any { it.pkg==pkg && it.start<to && it.end>from })
         if(!hasEvidence) null else unionDuration(intervals.map { maxOf(it.first,from) to minOf(it.second,to) })
     }
     val maxValue=maxOf(3_600_000L,values.filterNotNull().maxOrNull() ?: 0)

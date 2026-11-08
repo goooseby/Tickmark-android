@@ -1,0 +1,5 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical" android:padding="18dp" android:background="@drawable/widget_today_background">
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_today_name" android:textColor="@color/widget_today_ink" android:textSize="14sp"/>
+    <TextView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:gravity="center_vertical" android:text="@string/widget_preview_today_duration" android:textColor="@color/widget_today_ink" android:textSize="32sp" android:fontFamily="sans-serif-medium"/>
+    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="@string/widget_preview_goal" android:textColor="@color/widget_today_secondary" android:textSize="12sp"/>
+</LinearLayout>

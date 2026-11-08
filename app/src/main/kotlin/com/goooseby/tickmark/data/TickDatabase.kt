@@ -29,6 +29,8 @@ interface TickDao {
     @Query("SELECT * FROM config") fun config(): Flow<List<ConfigRow>>
     @Query("SELECT e.time FROM events e WHERE e.kind = 'UNLOCK' AND (SELECT p.kind FROM events p WHERE (p.time < e.time OR (p.time = e.time AND p.sequence < e.sequence)) AND p.kind IN ('LOCK','UNLOCK','STARTUP','SHUTDOWN','OBSERVE_LOCKED','OBSERVE_UNLOCKED') ORDER BY p.time DESC, p.sequence DESC LIMIT 1) IN ('LOCK','OBSERVE_LOCKED')")
     fun unlocks(): Flow<List<Long>>
+    @Query("SELECT e.time FROM events e WHERE e.kind = 'UNLOCK' AND (SELECT p.kind FROM events p WHERE (p.time < e.time OR (p.time = e.time AND p.sequence < e.sequence)) AND p.kind IN ('LOCK','UNLOCK','STARTUP','SHUTDOWN','OBSERVE_BOOT','OBSERVE_LOCKED','OBSERVE_UNLOCKED') ORDER BY p.time DESC, p.sequence DESC LIMIT 1) IN ('LOCK','OBSERVE_LOCKED')")
+    suspend fun allUnlocks(): List<Long>
     @Query("SELECT * FROM sessions ORDER BY start") suspend fun allSessions(): List<SessionRow>
     @Query("SELECT * FROM spans ORDER BY start") suspend fun allSpans(): List<SpanRow>
     @Query("SELECT * FROM annotations ORDER BY start") suspend fun allAnnotations(): List<AnnotationRow>

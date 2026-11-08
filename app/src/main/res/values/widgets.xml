@@ -1,0 +1,22 @@
+<resources>
+    <color name="widget_today_background">#EAF0FB</color>
+    <color name="widget_today_ink">#172B48</color>
+    <color name="widget_today_secondary">#5B6E89</color>
+    <color name="widget_today_accent">#3C68AC</color>
+    <color name="widget_today_track">#D5E0F2</color>
+    <color name="widget_away_background">#E9F1E9</color>
+    <color name="widget_away_ink">#183C30</color>
+    <color name="widget_away_secondary">#5C7869</color>
+    <color name="widget_away_accent">#54896D</color>
+    <color name="widget_away_track">#CDDFD0</color>
+    <string name="widget_today_name">今日用时</string>
+    <string name="widget_today_description">今日用时、目标与小时分布</string>
+    <string name="widget_away_name">未使用时段</string>
+    <string name="widget_away_description">最长未使用时段与全天分布</string>
+    <string name="widget_loading">正在读取记录</string>
+    <string name="widget_preview_away_title">最长未使用</string>
+    <string name="widget_preview_away_duration">45分钟</string>
+    <string name="widget_preview_away_range">14:10 – 14:55</string>
+    <string name="widget_preview_today_duration">1时28分</string>
+    <string name="widget_preview_goal">目标 2小时</string>
+</resources>

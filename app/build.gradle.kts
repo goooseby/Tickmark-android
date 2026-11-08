@@ -11,8 +11,8 @@ android {
         applicationId = "com.goooseby.tickmark"
         minSdk = 29
         targetSdk = 36
-        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("2").get().toInt()
-        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.2.0").get()
+        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("3").get().toInt()
+        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.3.0").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -45,6 +45,7 @@ dependencies {
     implementation("androidx.room:room-ktx:2.8.3")
     kapt("androidx.room:room-compiler:2.8.3")
     implementation("androidx.work:work-runtime-ktx:2.10.5")
+    implementation("androidx.glance:glance-appwidget:1.2.0")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

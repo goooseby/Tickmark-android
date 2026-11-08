@@ -13,22 +13,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.goooseby.tickmark.app.Records
+import com.goooseby.tickmark.data.report.Records
 import com.goooseby.tickmark.data.*
 import com.goooseby.tickmark.engine.model.unionDuration
 import java.time.*
 
-@Composable internal fun TodayReports(records:Records,date:LocalDate,from:Long,to:Long,filtered:Boolean,onHour:(Int)->Unit,onClearRange:()->Unit,onRange:()->Unit,onDetail:()->Unit,onApp:(SessionRow)->Unit,onEdit:(AnnotationRow)->Unit,onGoal:()->Unit={},onJournal:()->Unit={}) {
+@Composable internal fun TodayReports(records:Records,date:LocalDate,from:Long,to:Long,filtered:Boolean,onHour:(Int)->Unit,onClearRange:()->Unit,onRange:()->Unit,onDetail:()->Unit,onApp:(SessionRow)->Unit,onEdit:(AnnotationRow)->Unit,onGoal:()->Unit={},onJournal:()->Unit={},onAway:()->Unit={}) {
     fun openApp(pkg:String) { records.sessions.firstOrNull { it.pkg==pkg }?.let(onApp) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=20.dp)) {
         item { Summary(records,dayStart(date),minOf(dayStart(date.plusDays(1)),System.currentTimeMillis())) }
         item { GoalProgress(records,date,onGoal) }
         item { ChartTitle("每小时使用", "选择时段",onRange) }
         item { HourlyChart(records,date,selectedHour=if(filtered) Instant.ofEpochMilli(from).atZone(ZoneId.systemDefault()).hour else null) { start,_ -> onHour(Instant.ofEpochMilli(start).atZone(ZoneId.systemDefault()).hour) } }
+        item { AwayOverview(records.deviceReport(from,to),onAway) }
         item {
             ChartTitle(if(filtered) "${clock(from)} – ${clock(to)}" else "全天应用构成",if(filtered) "查看全天" else null,onClearRange)
             if(filtered) {
-                val known=records.spans.filter { it.state=="IN_USE" }.sumOf { com.goooseby.tickmark.engine.model.overlap(it.start,it.end,from,to) }
+                val known=records.deviceReport(from,to).used
                 Text("已确认使用 ${duration(known)}",Modifier.padding(horizontal=20.dp),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

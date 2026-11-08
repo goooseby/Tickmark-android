@@ -45,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.goooseby.tickmark.app.*
+import com.goooseby.tickmark.data.report.Records
 import com.goooseby.tickmark.data.*
 import com.goooseby.tickmark.engine.model.overlap
 import com.goooseby.tickmark.engine.model.unionDuration
@@ -69,7 +70,7 @@ fun duration(ms: Long): String {
 internal fun appName(pkg: String, records: Records): String = if (pkg == "@excluded") "已排除的应用" else records.apps.find { it.pkg == pkg }?.name ?: pkg
 internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
-@Composable fun Tickmark(repo: TickRepository) {
+@Composable fun Tickmark(repo: TickRepository,entry:ReportEntry?=null,onEntryConsumed:()->Unit={}) {
     val vm: TickViewModel = viewModel(factory = object : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = TickViewModel(repo) as T
     })
@@ -106,6 +107,16 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
             dateString=weekReturnAnchor!!; detail=weekReturnDetail; reviewWeek=true
             rangeStart=null; rangeEnd=null; weekReturnAnchor=null; weekReturnDetail=null
         } else detail=null
+    }
+    LaunchedEffect(entry) {
+        entry?.let {
+            tab=if(it.destination=="capture") 2 else 0
+            dateString=it.date.toString();rangeStart=null;rangeEnd=null
+            settingsRoute=if(it.destination=="capture") "capture" else null
+            detail=if(it.destination=="away") "@away" else null
+            parentDetail=null;weekReturnAnchor=null;weekReturnDetail=null
+            onEntryConsumed()
+        }
     }
     var showDate by remember { mutableStateOf(false) }
     var showRange by remember { mutableStateOf(false) }
@@ -157,7 +168,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
         val from = rangeStart ?: if(weekly) weekBounds.first() else dayStart(date)
         val to = minOf(rangeEnd ?: if(weekly) weekBounds.last() else dayStart(date.plusDays(1)), System.currentTimeMillis())
         val selected = records.sessions.filter { it.start < to && it.end > from }
-        val title = when { settingsRoute!=null -> when { settingsRoute!!.startsWith("app:")->records.apps.find{it.pkg==settingsRoute!!.removePrefix("app:")}?.name ?: "应用设置"; else->mapOf("apps" to "应用管理","goals" to "每日目标","appearance" to "外观","capture" to "采集状态","data" to "数据管理","updates" to "版本与更新","privacy" to "隐私说明","project" to "项目与反馈")[settingsRoute] ?: "设置" }; detail=="@journal"->"每日复盘"; detail == "@range" -> "时段复盘"; detail != null -> appName(detail!!, records); tab == 0 -> if (date == LocalDate.now()) "今日" else "每日概览"; tab == 1 -> "回顾"; else -> "设置" }
+        val title = when { settingsRoute!=null -> when { settingsRoute!!.startsWith("app:")->records.apps.find{it.pkg==settingsRoute!!.removePrefix("app:")}?.name ?: "应用设置"; else->mapOf("apps" to "应用管理","goals" to "每日目标","appearance" to "外观","capture" to "采集状态","data" to "数据管理","updates" to "版本与更新","privacy" to "隐私说明","project" to "项目与反馈","widgets" to "桌面组件")[settingsRoute] ?: "设置" }; detail=="@away"->"未使用时段"; detail=="@journal"->"每日复盘"; detail == "@range" -> "时段复盘"; detail != null -> appName(detail!!, records); tab == 0 -> if (date == LocalDate.now()) "今日" else "每日概览"; tab == 1 -> "回顾"; else -> "设置" }
         Scaffold(
             topBar = { TopAppBar(title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = {
                 if (settingsRoute!=null || detail != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回") }
@@ -185,12 +196,14 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
                         "privacy" -> PrivacySettings()
                         "updates" -> UpdateScreen(updates)
                         "project" -> ProjectSettings()
+                        "widgets" -> WidgetSettings(records,access)
                         "data" -> {
                             val bytes by produceState(0L,records.config["lastSync"]) { value=withContext(Dispatchers.IO) { val db=context.getDatabasePath("tickmark.db");db.length()+java.io.File(db.path+"-wal").length() } }
                             DataSettings(bytes,null,onBackup={exportJson.launch("Tickmark-${LocalDate.now()}.json")},onExport={exportCsv.launch("Tickmark-sessions-${LocalDate.now()}.csv")},onRestore={importJson.launch(arrayOf("application/json","text/plain","application/octet-stream"))},onClear={clear=true})
                         }
                         else -> records.apps.find{it.pkg==route.removePrefix("app:")}?.let { app->AppPreferences(app,records.config,onUpdate={task{repo.updateApp(it)}},onSaveGoal={value->task{repo.setConfig("appGoal:${app.pkg}" to value)}}) }
                     }
+                    detail=="@away" -> AwayPage(records,from,to) { a,b -> annotation=AnnotationRow(UUID.randomUUID().toString(),a,b,"","") }
                     detail=="@journal" -> DailyReflection(records,date) { good,change,next->task{repo.setConfig("review:$date:good" to good,"review:$date:change" to change,"review:$date:next" to next)} }
                     detail != null -> DetailReports(detail!!, records, selected, from, to, onApp = { parentDetail = detail; detail = it }, onAnnotate = { annotation = AnnotationRow(UUID.randomUUID().toString(), from, to, "", "") }, onEdit = { annotation = it }, onUpdateApp = { task { repo.updateApp(it) } }, onDate = { if(weekly) { weekReturnAnchor=dateString; weekReturnDetail=detail }; dateString = it.toString(); reviewWeek = false; rangeStart = null; rangeEnd = null }, weekly = weekly)
                     tab == 2 -> SettingsHome(records,access,::openSettings)
@@ -202,7 +215,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
                         if (tab == 0) TodayReports(records, date, from, to, rangeStart != null,
                             onHour = { hour -> val z = ZoneId.systemDefault(); rangeStart = date.atTime(hour,0).atZone(z).toInstant().toEpochMilli(); rangeEnd = date.atTime(hour,0).plusHours(1).atZone(z).toInstant().toEpochMilli() },
                             onClearRange = { rangeStart = null; rangeEnd = null }, onRange = { showRange = true }, onDetail = { detail = "@range" },
-                            onApp = { s -> detail = s.pkg }, onEdit = { annotation = it }, onGoal={openSettings("goals")},onJournal={detail="@journal"})
+                            onApp = { s -> detail = s.pkg }, onEdit = { annotation = it }, onGoal={openSettings("goals")},onJournal={detail="@journal"},onAway={detail="@away"})
                         else if(reviewWeek) WeeklyReports(records,date,onApp={ detail=it },onDay={ weekReturnAnchor=dateString; weekReturnDetail=null; dateString=it.toString(); reviewWeek=false; rangeStart=null; rangeEnd=null },onRange={ a,b -> weekReturnAnchor=dateString; weekReturnDetail=null; dateString=Instant.ofEpochMilli(a).atZone(ZoneId.systemDefault()).toLocalDate().toString(); reviewWeek=false; rangeStart=a; rangeEnd=b; detail="@range" })
                         else ReviewReports(records, date, from, to, onApp = { detail = it }, onRange = { showRange = true }, onDate = { dateString = it.toString(); rangeStart = null; rangeEnd = null })
                     }
@@ -238,9 +251,9 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     }
 }
 @Composable internal fun Summary(records: Records, from: Long, to: Long) {
-    val known = records.spans.filter { it.state == "IN_USE" }.sumOf { overlap(it.start,it.end,from,to) }
-    val inferred = unionDuration(records.sessions.filter { it.inferred }.map { maxOf(it.start,from) to minOf(it.end,to) })
-    val rounds = records.spans.filter { it.state == "IN_USE" && it.start < to && it.end > from }
+    val report=remember(records.spans,from,to){records.deviceReport(from,to)}
+    val known = report.used
+    val rounds = records.deviceSpans.filter { it.state == com.goooseby.tickmark.engine.model.DeviceState.IN_USE && it.start < to && it.end > from }
     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Metric("手机使用", duration(known), Modifier.weight(1.3f))
         Metric(if(records.config["screenOnly"]=="true") "亮屏次数" else "解锁次数", "${if(records.config["screenOnly"]=="true") rounds.count { it.start>=from } else records.unlocks.count { it >= from && it < to }}", Modifier.weight(0.8f))
