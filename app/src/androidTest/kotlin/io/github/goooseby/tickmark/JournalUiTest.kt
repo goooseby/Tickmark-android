@@ -25,12 +25,14 @@ class JournalUiTest {
         db=Room.inMemoryDatabaseBuilder(context,TickDatabase::class.java).build();repo=TickRepository(context,db,captureEnabled=false)
         compose.runOnUiThread{compose.activity.enableEdgeToEdge()}
     }
-    @After fun close(){db.close()}
+    @After fun close(){compose.activityRule.scenario.close();db.close()}
     private fun openHub(){compose.setContent{Tickmark(repo)};compose.onNodeWithText("记录").performClick()}
     private fun waitEditor(){compose.waitUntil(5000){compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()}}
     private fun waitStored(predicate:(List<JournalRow>)->Boolean){compose.waitUntil(5000){runBlocking{predicate(repo.dao.allJournal())}}}
     private fun screenshot(name:String){
         compose.waitForIdle()
+        compose.onRoot().captureToImage() // Flush the Compose frame before capturing system bars too.
+        android.os.SystemClock.sleep(400) // Allow the real IME/window animation to finish for visual QA.
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val folder=File(instrumentation.targetContext.getExternalFilesDir(null),"validation").apply{mkdirs()}
         File(folder,"$name.png").outputStream().use{instrumentation.uiAutomation.takeScreenshot().compress(Bitmap.CompressFormat.PNG,100,it)}
@@ -68,7 +70,7 @@ class JournalUiTest {
         screenshot("journal-daily-editor")
         compose.onNodeWithContentDescription("返回并保存").performClick()
         screenshot("journal-hub")
-        compose.onNodeWithText("搜索记录").performTextInput("阅读清单")
+        compose.onNode(hasSetTextAction()).performTextInput("阅读清单")
         compose.onNodeWithText("通勤随记").assertDoesNotExist()
         compose.onNode(hasText("阅读清单") and !hasSetTextAction()).performClick();waitEditor()
         screenshot("journal-note-editor")
@@ -108,12 +110,25 @@ class JournalUiTest {
         val note=JournalRow.note(LocalDate.now()).copy(title="一段需要继续编辑的长记录",body=body)
         runBlocking{repo.saveJournal(note,true)}
         openHub();compose.onNodeWithText(note.title).performClick();waitEditor()
-        compose.onNodeWithText("写下记录").performScrollTo().performTextInputSelection(androidx.compose.ui.text.TextRange(body.length))
+        compose.onNodeWithText("写下记录").performTextInputSelection(androidx.compose.ui.text.TextRange(body.length))
+        android.os.SystemClock.sleep(400) // Settle a soft keyboard if this emulator enables it.
         compose.onNodeWithText("写下记录").performTextInput("\n追加一条计划。")
+        compose.onNodeWithText("写下记录").performTextInputSelection(androidx.compose.ui.text.TextRange(body.length+"\n追加一条计划。".length))
         compose.onNodeWithText("完成").assertIsDisplayed()
         screenshot("journal-long-note-keyboard")
         compose.onNodeWithContentDescription("返回并保存").performClick()
         waitStored{it.single().body.endsWith("追加一条计划。")}
         assertTrue(runBlocking{repo.dao.allJournal().single().body}.startsWith(body))
+    }
+    @Test fun todayActionOpensYesterdayReviewAndReturnsToToday() {
+        val yesterday=LocalDate.now().minusDays(1)
+        runBlocking{repo.saveJournal(JournalRow.daily(yesterday).copy(action="今天去散步"),true)}
+        compose.setContent{Tickmark(repo)}
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("今天去散步"))
+        compose.onNodeWithText("今天去散步").performClick();waitEditor()
+        compose.onNodeWithText("${yesterday.monthValue}月${yesterday.dayOfMonth}日",substring=true).assertIsDisplayed()
+        compose.onNodeWithContentDescription("返回并保存").performClick()
+        compose.onNodeWithText("每日概览").assertDoesNotExist()
+        compose.onAllNodesWithText("今日").assertCountEquals(2)
     }
 }

@@ -120,14 +120,14 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
         }
     }
     val journalState=rememberSaveableStateHolder()
-    val journalEditor=when {detail=="@journal"->JournalRow.daily(date);detail?.startsWith("@note:")==true->JournalRow(detail!!.removePrefix("@"),dateString,"NOTE");else->null}
+    var journalDateString by rememberSaveable {mutableStateOf(LocalDate.now().toString())}
+    val journalEditor=when {detail=="@journal"->JournalRow.daily(LocalDate.parse(journalDateString));detail?.startsWith("@note:")==true->JournalRow(detail!!.removePrefix("@"),journalDateString,"NOTE");else->null}
     fun openDaily(value:LocalDate) {
-        if(tab==1 && weekReturnAnchor==null) {weekReturnAnchor=dateString;weekReturnDetail=null}
-        dateString=value.toString();rangeStart=null;rangeEnd=null;detail="@journal"
+        journalDateString=value.toString();detail="@journal"
     }
     fun openJournal(value:JournalRow) {
         if(value.kind=="DAILY") openDaily(LocalDate.parse(value.date))
-        else {dateString=value.date;detail="@${value.id}"}
+        else {journalDateString=value.date;detail="@${value.id}"}
     }
     var showDate by remember { mutableStateOf(false) }
     var showRange by remember { mutableStateOf(false) }

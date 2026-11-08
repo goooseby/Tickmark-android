@@ -47,7 +47,7 @@ class ReportUiTest {
         repo.dao.putSessions(sessions); repo.dao.putSpans(spans); repo.dao.putCoverage(coverage)
         repo.dao.putConfig(listOf(ConfigRow("paused","false"),ConfigRow("lastSync",System.currentTimeMillis().toString())))
     }
-    @After fun close() { db.close() }
+    @After fun close() { compose.activityRule.scenario.close();db.close() }
     private fun screenshot(name:String) {
         compose.waitForIdle()
         val instrumentation=InstrumentationRegistry.getInstrumentation()
@@ -125,6 +125,11 @@ class ReportUiTest {
         compose.onNodeWithText("写复盘").performClick()
         compose.waitUntil(5000){compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()}
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("提前放下手机")
+        compose.runOnUiThread {
+            compose.activity.getSystemService(android.view.inputmethod.InputMethodManager::class.java).hideSoftInputFromWindow(compose.activity.window.decorView.windowToken,0)
+        }
+        compose.waitUntil(5000){!androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(compose.activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime())}
+        android.os.SystemClock.sleep(300) // Finish the real IME animation before scrolling to another field.
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("明天的一个小行动"))
         compose.onNodeWithText("明天的一个小行动").performTextInput("睡前先读十页")
         compose.onNodeWithText("完成").performClick()

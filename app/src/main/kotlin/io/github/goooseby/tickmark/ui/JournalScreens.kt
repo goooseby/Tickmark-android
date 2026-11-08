@@ -73,22 +73,21 @@ internal fun journalDate(date:LocalDate):String="${date.monthValue}月${date.day
                 when(filter){1->row.kind=="DAILY";2->row.kind=="NOTE";3->!row.draft && row.action.isNotBlank() && row.actionDone==completedActions;else->true}
         }.sortedWith(compareByDescending<JournalRow>{it.pinned}.thenByDescending{it.date}.thenByDescending{it.updatedAt})
     }
-    Box(Modifier.fillMaxSize()) {
-        LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=100.dp)) {
-            item {
+    Box(Modifier.fillMaxSize().imePadding()) {
+        Column(Modifier.fillMaxSize()) {
                 Row(Modifier.padding(start=16.dp,end=8.dp,top=8.dp,bottom=4.dp),verticalAlignment=Alignment.CenterVertically) {
                     OutlinedTextField(query,{query=it},Modifier.weight(1f),placeholder={Text("搜索记录")},leadingIcon={Icon(Icons.Outlined.Search,null)},trailingIcon={if(query.isNotEmpty()) IconButton(onClick={query=""}){Icon(Icons.Outlined.Close,"清除搜索")}},singleLine=true)
                     IconButton(onClick={calendar=true}) {Icon(Icons.Outlined.CalendarMonth,"按日期筛选")}
                 }
-            }
-            item {FlowRow(Modifier.padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            FlowRow(Modifier.padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 listOf("全部","复盘","随手记","行动").forEachIndexed { i,label -> FilterChip(filter==i,{filter=i},label={Text(label)}) }
                 dateFilter?.let {date->InputChip(true,onClick={dateFilter=null},modifier=Modifier.semantics{contentDescription="清除日期筛选"},label={Text(journalDate(LocalDate.parse(date)))},trailingIcon={Icon(Icons.Outlined.Close,null,Modifier.size(16.dp))})}
-            }}
-            if(filter==3) item {Row(Modifier.padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            }
+            if(filter==3) Row(Modifier.padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                 FilterChip(!completedActions,{completedActions=false},label={Text("待完成")})
                 FilterChip(completedActions,{completedActions=true},label={Text("已完成")})
-            }}
+            }
+            LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(bottom=100.dp)) {
             if(query.isEmpty() && dateFilter==null && filter==0) item {JournalWeek(records,LocalDate.now(),onDaily);HorizontalDivider(Modifier.padding(top=8.dp))}
             if(visible.isEmpty()) item {
                 Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -122,6 +121,7 @@ internal fun journalDate(date:LocalDate):String="${date.monthValue}月${date.day
                         }},modifier=Modifier.clickable{onOpen(row)})
                 }
             }
+        }
         }
         ExtendedFloatingActionButton(onClick={create=true},icon={Icon(Icons.Outlined.Add,null)},text={Text("新建记录")},modifier=Modifier.align(Alignment.BottomEnd).padding(16.dp).semantics{contentDescription="新建记录"})
     }
@@ -214,15 +214,25 @@ private val journalSaver=Saver<JournalRow,String>(save={JournalCodec.encode(it).
         TextButton(onClick={leave(true)},enabled=loaded && row.meaningful && !saving){Text(if(saving) "保存中" else "完成")}
     })}) {padding->
         if(!loaded) Box(Modifier.fillMaxSize().padding(padding),contentAlignment=Alignment.Center){if(error==null) CircularProgressIndicator() else Text(error!!)}
-        else LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding(),contentPadding=PaddingValues(start=20.dp,end=20.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-            item {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+        else {
+            val dateHeader: @Composable ()->Unit = {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 TextButton(onClick={showDate=true},enabled=!saving,contentPadding=PaddingValues(horizontal=0.dp)) {
                     Icon(Icons.Outlined.CalendarMonth,null,Modifier.size(18.dp));Spacer(Modifier.width(8.dp));Text(journalDate(LocalDate.parse(row.date)))
                 }
                 Spacer(Modifier.weight(1f))
                 Text(if(row.draft) "草稿" else "已记录",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             }}
-            if(row.kind=="DAILY") {
+            val saveStatus: @Composable ()->Unit = {Text(error ?: status.ifBlank{if(row.updatedAt>0) "上次保存 ${java.time.Instant.ofEpochMilli(row.updatedAt).atZone(ZoneId.systemDefault()).toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))}" else ""},style=MaterialTheme.typography.bodySmall,color=if(error!=null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)}
+            if(row.kind=="NOTE") Column(
+                Modifier.fillMaxSize().padding(padding).imePadding().padding(horizontal=20.dp,vertical=8.dp),
+                verticalArrangement=Arrangement.spacedBy(12.dp)
+            ) {
+                dateHeader()
+                OutlinedTextField(row.title,{if(it.length<=100) change(row.copy(title=it))},Modifier.fillMaxWidth(),label={Text("标题（可选）")},singleLine=true)
+                OutlinedTextField(row.body,{if(it.length<=8000) change(row.copy(body=it))},Modifier.fillMaxWidth().weight(1f),label={Text("写下记录")})
+                saveStatus()
+            } else LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding(),contentPadding=PaddingValues(start=20.dp,end=20.dp,bottom=32.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                item {dateHeader()}
                 val report=records.dayReport(LocalDate.parse(row.date))
                 if(report.spans.any{it.state!=io.github.goooseby.tickmark.engine.model.DeviceState.UNKNOWN}) item {
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(20.dp)) {
@@ -237,11 +247,8 @@ private val journalSaver=Saver<JournalRow,String>(save={JournalCodec.encode(it).
                 item {OutlinedTextField(row.adjustment,{if(it.length<=2000) change(row.copy(adjustment=it))},Modifier.fillMaxWidth(),label={Text("想调整的时段")},minLines=2,maxLines=8)}
                 item {OutlinedTextField(row.action,{if(it.length<=1000) change(row.copy(action=it,actionDone=if(it!=row.action) false else row.actionDone))},Modifier.fillMaxWidth(),label={Text("明天的一个小行动")},minLines=2,maxLines=6)}
                 if(row.action.isNotBlank()) item {Row(verticalAlignment=Alignment.CenterVertically){Checkbox(row.actionDone,{change(row.copy(actionDone=it))});Text("行动已完成",Modifier.clickable{change(row.copy(actionDone=!row.actionDone))})}}
-            } else {
-                item {OutlinedTextField(row.title,{if(it.length<=100) change(row.copy(title=it))},Modifier.fillMaxWidth(),label={Text("标题（可选）")},singleLine=true)}
-                item {OutlinedTextField(row.body,{if(it.length<=8000) change(row.copy(body=it))},Modifier.fillMaxWidth(),label={Text("写下记录")},minLines=10,maxLines=24)}
+                item {saveStatus()}
             }
-            item {Text(error ?: status.ifBlank{if(row.updatedAt>0) "上次保存 ${java.time.Instant.ofEpochMilli(row.updatedAt).atZone(ZoneId.systemDefault()).toLocalTime().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))}" else ""},style=MaterialTheme.typography.bodySmall,color=if(error!=null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)}
         }
     }
     if(showDate) JournalDatePicker(LocalDate.parse(row.date),{showDate=false}) {date->
