@@ -5,10 +5,10 @@ plugins {
     id("org.jetbrains.kotlin.kapt")
 }
 android {
-    namespace = "com.goooseby.tickmark"
+    namespace = "io.github.goooseby.tickmark"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.goooseby.tickmark"
+        applicationId = "io.github.goooseby.tickmark"
         minSdk = 29
         targetSdk = 36
         versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("3").get().toInt()

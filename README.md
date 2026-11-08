@@ -34,8 +34,8 @@
 | `docs/` | 产品、交互、数据、架构、验收文档 |
 | `docs/archive/` | 初始资料归档 |
 
-applicationId 为 `com.goooseby.tickmark`，最低 Android 10 / API 29，当前编译/目标 API 36。第一版按单设备、个人使用设计。
+applicationId 为 `io.github.goooseby.tickmark`，最低 Android 10 / API 29，当前编译/目标 API 36。第一版按单设备、个人使用设计。
 
-包名在首次发布前统一为 GitHub 用户名对应的 `com.goooseby.tickmark`；后续发布保持稳定。仓库名不决定 applicationId。早期开发包属于不同应用，不作覆盖升级，必要时用逻辑备份迁移记录。
+包名在首次发布前统一为 GitHub 用户名对应的 `io.github.goooseby.tickmark`；后续发布保持稳定。仓库名不决定 applicationId。早期开发包属于不同应用，不作覆盖升级，必要时用逻辑备份迁移记录。
 
 构建：`./gradlew.bat :app:assembleDebug :engine:test :app:lintDebug`。APK 位于 `app/build/outputs/apk/debug/app-debug.apk`。本机 SDK 使用忽略提交的 `local.properties`。

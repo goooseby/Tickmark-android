@@ -12,21 +12,21 @@
 
 | 目录 | 责任 |
 | --- | --- |
-| `app/src/main/kotlin/com/goooseby/tickmark/app` | 应用入口、依赖装配、导航 |
-| `app/src/main/kotlin/com/goooseby/tickmark/platform/usage` | 系统事件适配、可用能力、权限检查 |
-| `app/src/main/kotlin/com/goooseby/tickmark/platform/packages` | 应用名称、图标、可见性处理 |
-| `app/src/main/kotlin/com/goooseby/tickmark/data/local` | Room 实体、DAO、迁移、事务 |
-| `app/src/main/kotlin/com/goooseby/tickmark/data/repository` | 同步、缓存、查询与数据流 |
-| `app/src/main/kotlin/com/goooseby/tickmark/data/transfer` | 导出、备份、恢复 |
-| `app/src/main/kotlin/com/goooseby/tickmark/feature/today` | 日期时间线、选区与标注入口 |
-| `app/src/main/kotlin/com/goooseby/tickmark/feature/review` | 摘要、排行、趋势 |
-| `app/src/main/kotlin/com/goooseby/tickmark/feature/appdetail` | 单应用详情 |
-| `app/src/main/kotlin/com/goooseby/tickmark/feature/settings` | 配置与权限状态 |
-| `app/src/main/kotlin/com/goooseby/tickmark/core/ui` | 主题、时间轴、图表、状态组件 |
-| `app/src/main/kotlin/com/goooseby/tickmark/worker` | 补采与保留策略执行 |
-| `engine/src/main/kotlin/com/goooseby/tickmark/engine/model` | 标准化事件、区间、质量与来源 |
-| `engine/src/main/kotlin/com/goooseby/tickmark/engine/session` | 状态机、检查点、会话重建 |
-| `engine/src/main/kotlin/com/goooseby/tickmark/engine/analytics` | 并集、切分、投影与用途统计 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/app` | 应用入口、依赖装配、导航 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/platform/usage` | 系统事件适配、可用能力、权限检查 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/platform/packages` | 应用名称、图标、可见性处理 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/data/local` | Room 实体、DAO、迁移、事务 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/data/repository` | 同步、缓存、查询与数据流 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/data/transfer` | 导出、备份、恢复 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/feature/today` | 日期时间线、选区与标注入口 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/feature/review` | 摘要、排行、趋势 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/feature/appdetail` | 单应用详情 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/feature/settings` | 配置与权限状态 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/core/ui` | 主题、时间轴、图表、状态组件 |
+| `app/src/main/kotlin/io/github/goooseby/tickmark/worker` | 补采与保留策略执行 |
+| `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/model` | 标准化事件、区间、质量与来源 |
+| `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/session` | 状态机、检查点、会话重建 |
+| `engine/src/main/kotlin/io/github/goooseby/tickmark/engine/analytics` | 并集、切分、投影与用途统计 |
 | `engine/src/test` | 合成序列回放和性质测试 |
 | `app/src/androidTest` | Room 迁移、系统接入与关键操作验证 |
 

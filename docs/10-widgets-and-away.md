@@ -33,6 +33,6 @@ Room 事务读取统一 Records 快照，页面 Flow 与组件发布使用同一
 
 已验证连续息屏/锁屏、间隙、未知、重叠冲突、跨日、DST及随机区间分割不变量。组件/日统计/小时桶总量一致；另测半小时夏令时变化、事务快照、恢复冲突、入口日期及筛选/标注/返回流程。实际固定到 API36 Pixel Launcher，检查2×2、4×2、浅/深色与360dp大字体。完整检查结果见 [验证记录](validation/README.md)。真机厂商后台尚未验证。
 
-可选视觉测试需先固定组件到 QA 模拟器桌面的下一页，再以 `-e widgetVisual true -e class com.goooseby.tickmark.WidgetReportTest#renderPinnedWidgetsForVisualInspection` 运行。该测试只替换组件缓存并保存截图，结束恢复真实聚合；常规全量测试会跳过它，避免自动测试改动桌面内容。正式数据库不注入样例。
+可选视觉测试需先固定组件到 QA 模拟器桌面的下一页，再以 `-e widgetVisual true -e class io.github.goooseby.tickmark.WidgetReportTest#renderPinnedWidgetsForVisualInspection` 运行。该测试只替换组件缓存并保存截图，结束恢复真实聚合；常规全量测试会跳过它，避免自动测试改动桌面内容。正式数据库不注入样例。
 
 实现参考：[Glance 组件创建与状态更新](https://developer.android.com/develop/ui/compose/glance/create-app-widget)、[响应式布局](https://developer.android.com/develop/ui/compose/glance/build-ui)。

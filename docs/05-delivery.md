@@ -72,9 +72,9 @@ engine 使用合成序列测试确定的事件边界、区间并集和跨日规�
 - JDK 21，Gradle Wrapper 8.13，AGP 8.13.2，Kotlin 2.2.21，compile/target SDK 36。
 - SDK：`D:/AndroidDev/Sdk`；AVD：`Keye_Phone_API_36`，Android 16 / API 36。
 - 构建与静态检查：`./gradlew.bat :app:assembleDebug :app:lintDebug :engine:test`。
-- 构建测试包：`./gradlew.bat :app:assembleDebugAndroidTest`；可用 `:app:connectedDebugAndroidTest` 或 ADB 安装两包并运行 `com.goooseby.tickmark.test/androidx.test.runner.AndroidJUnitRunner`。
+- 构建测试包：`./gradlew.bat :app:assembleDebugAndroidTest`；可用 `:app:connectedDebugAndroidTest` 或 ADB 安装两包并运行 `io.github.goooseby.tickmark.test/androidx.test.runner.AndroidJUnitRunner`。
 - 安装：`D:/AndroidDev/Sdk/platform-tools/adb.exe install -r app/build/outputs/apk/debug/app-debug.apk`。
-- 启动：`adb shell am start -n com.goooseby.tickmark/.app.MainActivity`。
+- 启动：`adb shell am start -n io.github.goooseby.tickmark/.app.MainActivity`。
 - 本机直连 Maven Central TLS 握手失败，依赖仓库加入 Aliyun Central 镜像；Google 依赖仍从 Google 仓库解析。
 
 ## 本轮验证记录
