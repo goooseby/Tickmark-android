@@ -22,7 +22,7 @@ class WidgetReportTest {
     private fun fixture():Pair<Records,Long> {
         val day=LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val minute=60_000L
-        val records=Records(spans=listOf(SpanRow(day,day+35*minute,"IN_USE"),SpanRow(day+35*minute,day+95*minute,"SCREEN_OFF"),SpanRow(day+95*minute,day+100*minute,"LOCKED"),SpanRow(day+100*minute,day+135*minute,"IN_USE"),SpanRow(day+135*minute,day+170*minute,"SCREEN_OFF"),SpanRow(day+170*minute,day+180*minute,"IN_USE")),config=mapOf("lastObserved" to (day+180*minute).toString(),"dailyGoalMinutes" to "120","review:${LocalDate.now().minusDays(1)}:next" to "睡前先读十页"))
+        val records=Records(spans=listOf(SpanRow(day,day+35*minute,"IN_USE"),SpanRow(day+35*minute,day+95*minute,"SCREEN_OFF"),SpanRow(day+95*minute,day+100*minute,"LOCKED"),SpanRow(day+100*minute,day+135*minute,"IN_USE"),SpanRow(day+135*minute,day+170*minute,"SCREEN_OFF"),SpanRow(day+170*minute,day+180*minute,"IN_USE")),config=mapOf("lastObserved" to (day+180*minute).toString(),"dailyGoalMinutes" to "120"),journal=listOf(JournalRow.daily(LocalDate.now().minusDays(1)).copy(action="睡前先读十页",draft=false)))
         return records to day+180*minute
     }
     @Test fun widgetAndPageConsumeIdenticalDeviceProjection() {

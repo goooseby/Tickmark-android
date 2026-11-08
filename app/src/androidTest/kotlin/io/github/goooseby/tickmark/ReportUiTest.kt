@@ -123,13 +123,14 @@ class ReportUiTest {
         compose.setContent { Tickmark(repo) }
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("写复盘"))
         compose.onNodeWithText("写复盘").performClick()
+        compose.waitUntil(5000){compose.onAllNodes(hasSetTextAction()).fetchSemanticsNodes().isNotEmpty()}
         compose.onAllNodes(hasSetTextAction())[0].performTextInput("提前放下手机")
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("明天的一个小行动"))
         compose.onNodeWithText("明天的一个小行动").performTextInput("睡前先读十页")
-        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("保存复盘"))
-        compose.onNodeWithText("保存复盘").performClick()
+        compose.onNodeWithText("完成").performClick()
+        compose.waitUntil(5000){runBlocking{repo.dao.journal("day:${LocalDate.now()}")?.action=="睡前先读十页"}}
         compose.waitForIdle()
-        runBlocking { Assert.assertEquals("睡前先读十页",repo.dao.allConfig().find{it.key=="review:${LocalDate.now()}:next"}?.value) }
+        runBlocking { Assert.assertEquals("睡前先读十页",repo.dao.journal("day:${LocalDate.now()}")?.action) }
     }
     @Test fun awayEntryFiltersPresentationAndSavesAnnotationWithoutChangingTotals() {
         val date=LocalDate.now().minusDays(1)

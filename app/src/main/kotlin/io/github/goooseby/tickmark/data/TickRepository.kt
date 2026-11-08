@@ -32,16 +32,17 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
     val dao = db.dao()
     private val classifier by lazy { AppClassifier(context) }
     private val mutex = Mutex()
+    private val journalRevisions=mutableMapOf<String,Long>()
     val syncing = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
     val records: Flow<Records> = db.invalidationTracker.createFlow(
-        "sessions","spans","annotations","metadata","coverage","config","events",emitInitialState=true
+        "sessions","spans","annotations","metadata","coverage","config","events","journal",emitInitialState=true
     ).map { snapshot() }.distinctUntilChanged().flowOn(Dispatchers.IO)
 
     suspend fun snapshot(): Records = withContext(Dispatchers.IO) {
         db.withTransaction {
             Records(dao.allSessions(),dao.allSpans(),dao.allAnnotations(),dao.allApps(),dao.allCoverage(),
-                dao.allConfig().associate { it.key to it.value },dao.allUnlocks())
+                dao.allConfig().associate { it.key to it.value },dao.allUnlocks(),dao.allJournal())
         }
     }
     fun hasAccess(): Boolean = context.getSystemService(AppOpsManager::class.java)
@@ -167,6 +168,31 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
     suspend fun setPaused(paused: Boolean) = withContext(Dispatchers.IO) {
         mutex.withLock { dao.putConfig(listOf(ConfigRow("paused", paused.toString()))) }
     }
+    suspend fun journalForEditing(initial:JournalRow):Pair<JournalRow,Long> = exclusive {
+        (dao.journal(initial.id) ?: initial) to (journalRevisions[initial.id] ?: 0L)
+    }
+    suspend fun saveJournal(row:JournalRow,complete:Boolean=false,expectedRevision:Long?=null):JournalRow? = exclusive {
+        JournalRow.validate(row)
+        require(expectedRevision==null || expectedRevision==(journalRevisions[row.id] ?: 0L)){"记录已被删除或恢复，请返回后重新打开"}
+        val old=dao.journal(row.id)
+        if(!row.meaningful && old==null) return@exclusive null
+        require(!complete || row.meaningful){"请先填写记录内容"}
+        val now=System.currentTimeMillis()
+        val saved=row.copy(draft=if(complete) false else old?.draft ?: row.draft,
+            actionDone=if(old!=null && old.action!=row.action) false else row.actionDone,
+            createdAt=old?.createdAt?.takeIf{it>0} ?: row.createdAt.takeIf{it>0} ?: now,updatedAt=now)
+        dao.putJournal(listOf(saved));saved
+    }
+    suspend fun deleteJournal(id:String):JournalRow? = exclusive {
+        val old=dao.journal(id);journalRevisions[id]=(journalRevisions[id] ?: 0L)+1;dao.deleteJournal(id);old
+    }
+    suspend fun restoreJournal(row:JournalRow)=exclusive {JournalRow.validate(row);journalRevisions[row.id]=(journalRevisions[row.id] ?: 0L)+1;dao.putJournal(listOf(row))}
+    suspend fun toggleJournalAction(id:String)=exclusive {
+        dao.journal(id)?.takeIf{it.action.isNotBlank()}?.let {dao.putJournal(listOf(it.copy(actionDone=!it.actionDone,updatedAt=System.currentTimeMillis())))}
+    }
+    suspend fun pinJournal(id:String)=exclusive {
+        dao.journal(id)?.let {dao.putJournal(listOf(it.copy(pinned=!it.pinned)))}
+    }
     suspend fun updateApp(app: AppRow) = withContext(Dispatchers.IO) {
         mutex.withLock {
             db.withTransaction {
@@ -187,8 +213,9 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
         } }
     }
     suspend fun wipe() {
+        dao.allJournal().forEach{journalRevisions[it.id]=(journalRevisions[it.id] ?: 0L)+1}
         dao.deleteEvents(Long.MIN_VALUE, Long.MAX_VALUE); dao.deleteSessions(); dao.deleteSpans()
-        dao.deleteAnnotations(); dao.deleteApps(); dao.deleteConfig(); dao.deleteCoverage()
+        dao.deleteAnnotations(); dao.deleteApps(); dao.deleteConfig(); dao.deleteCoverage();dao.deleteJournal()
     }
     suspend fun <T> exclusive(block: suspend () -> T): T = withContext(Dispatchers.IO) { mutex.withLock { block() } }
 }

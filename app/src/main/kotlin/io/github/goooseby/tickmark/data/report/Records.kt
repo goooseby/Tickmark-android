@@ -17,6 +17,7 @@ data class Records(
     val coverage: List<CoverageRow> = emptyList(),
     val config: Map<String,String> = emptyMap(),
     val unlocks: List<Long> = emptyList(),
+    val journal:List<JournalRow> = emptyList(),
 ) {
     /** Normalize once per immutable database snapshot, including conflicts in restored records. */
     val deviceSpans: List<DeviceSpan> by lazy {

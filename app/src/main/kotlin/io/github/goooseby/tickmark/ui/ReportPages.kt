@@ -18,7 +18,7 @@ import io.github.goooseby.tickmark.data.*
 import io.github.goooseby.tickmark.engine.model.unionDuration
 import java.time.*
 
-@Composable internal fun TodayReports(records:Records,date:LocalDate,from:Long,to:Long,filtered:Boolean,onHour:(Int)->Unit,onClearRange:()->Unit,onRange:()->Unit,onDetail:()->Unit,onApp:(SessionRow)->Unit,onEdit:(AnnotationRow)->Unit,onGoal:()->Unit={},onJournal:()->Unit={},onAway:()->Unit={}) {
+@Composable internal fun TodayReports(records:Records,date:LocalDate,from:Long,to:Long,filtered:Boolean,onHour:(Int)->Unit,onClearRange:()->Unit,onRange:()->Unit,onDetail:()->Unit,onApp:(SessionRow)->Unit,onEdit:(AnnotationRow)->Unit,onGoal:()->Unit={},onJournal:(LocalDate)->Unit={},onAway:()->Unit={},onJournalAction:(JournalRow)->Unit={}) {
     fun openApp(pkg:String) { records.sessions.firstOrNull { it.pkg==pkg }?.let(onApp) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=20.dp)) {
         item { Summary(records,dayStart(date),minOf(dayStart(date.plusDays(1)),System.currentTimeMillis())) }
@@ -38,9 +38,7 @@ import java.time.*
             item { ChartTitle("时段内的应用分布","复盘与标注",onDetail) }
             item { AppDistribution(records,from,to,::openApp) }
         }
-        item { ChartTitle("每日复盘","写复盘",onJournal) }
-        val intention=records.config["review:$date:next"].orEmpty()
-        if(intention.isNotBlank()) item { Text(intention,Modifier.padding(horizontal=20.dp,vertical=8.dp),style=MaterialTheme.typography.bodyMedium) }
+        item {TodayJournal(records,date,onJournal,onJournalAction)}
         val notes=records.annotations.filter { it.start<to && it.end>from }
         if(notes.isNotEmpty()) {
             item { ChartTitle("标注") }

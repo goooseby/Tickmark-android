@@ -46,11 +46,13 @@ data class WidgetSnapshot(
                 if(away) it.state==DeviceState.SCREEN_OFF || it.state==DeviceState.LOCKED else it.state==DeviceState.IN_USE
             }.map{it.start to it.end},boundaries).map{it.duration}
             val longest=report.longestAway;val latest=report.latestAway
+            val plan=records.journal.find{it.id=="day:${date.minusDays(1)}" && !it.draft}
+            val action=plan?.let{if(it.actionDone && it.action.isNotBlank()) "已完成 · ${it.action}" else it.action}.orEmpty()
             return WidgetSnapshot(date.toString(),records.config["lastObserved"]?.toLongOrNull() ?: records.config["lastSync"]?.toLongOrNull() ?: 0,
                 report.used,report.notUsed,longest?.duration ?: 0,longest?.start ?: 0,longest?.end ?: 0,
                 latest?.duration ?: 0,latest?.start ?: 0,latest?.end ?: 0,
                 records.config["dailyGoalMinutes"]?.toLongOrNull()?.coerceIn(0,1440) ?: 0,
-                records.config["review:${date.minusDays(1)}:next"].orEmpty().take(160),access,records.config["paused"]=="true",
+                action.take(160),access,records.config["paused"]=="true",
                 report.spans.any{it.state!=DeviceState.UNKNOWN},bars(false),bars(true))
         }
         fun decode(text:String?):WidgetSnapshot? = runCatching {

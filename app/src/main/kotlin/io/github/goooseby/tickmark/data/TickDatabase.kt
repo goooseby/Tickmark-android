@@ -39,6 +39,11 @@ interface TickDao {
     @Query("SELECT * FROM metadata") suspend fun allApps(): List<AppRow>
     @Query("SELECT * FROM config") suspend fun allConfig(): List<ConfigRow>
     @Query("SELECT * FROM coverage ORDER BY start") suspend fun allCoverage(): List<CoverageRow>
+    @Query("SELECT * FROM journal ORDER BY date DESC, updatedAt DESC") suspend fun allJournal():List<JournalRow>
+    @Query("SELECT * FROM journal WHERE id=:id") suspend fun journal(id:String):JournalRow?
+    @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun putJournal(rows:List<JournalRow>)
+    @Query("DELETE FROM journal WHERE id=:id") suspend fun deleteJournal(id:String)
+    @Query("DELETE FROM journal") suspend fun deleteJournal()
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putEvents(rows: List<EventRow>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putSessions(rows: List<SessionRow>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun putSpans(rows: List<SpanRow>)
@@ -62,5 +67,15 @@ val MIGRATION_1_2=object:androidx.room.migration.Migration(1,2) {
         db.execSQL("ALTER TABLE metadata ADD COLUMN categoryOverride TEXT DEFAULT NULL")
     }
 }
-@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class], version = 2, exportSchema = false)
+val MIGRATION_2_3=object:androidx.room.migration.Migration(2,3) {
+    override fun migrate(db:androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL(JOURNAL_TABLE_SQL)
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_journal_date ON journal(date)")
+        val config=mutableMapOf<String,String>()
+        db.query("SELECT `key`,value FROM config WHERE `key` LIKE 'review:%'").use {while(it.moveToNext()) config[it.getString(0)]=it.getString(1)}
+        JournalRow.legacy(config).forEach{db.insertJournal(it)}
+        config.keys.filter{Regex("^review:\\d{4}-\\d{2}-\\d{2}:(good|change|next)$").matches(it)}.forEach {db.execSQL("DELETE FROM config WHERE `key`=?",arrayOf(it))}
+    }
+}
+@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class,JournalRow::class], version = 3, exportSchema = false)
 abstract class TickDatabase : RoomDatabase() { abstract fun dao(): TickDao }

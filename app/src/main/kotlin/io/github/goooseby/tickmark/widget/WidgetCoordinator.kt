@@ -20,7 +20,7 @@ val widgetFontScaleKey=floatPreferencesKey("host_font_scale")
 /** One publishing path for database commits, background capture, resizing and date changes. */
 object WidgetCoordinator {
     fun observe(application:TickmarkApp) {
-        application.repository.db.invalidationTracker.addObserver(object:InvalidationTracker.Observer("spans","config") {
+        application.repository.db.invalidationTracker.addObserver(object:InvalidationTracker.Observer("spans","config","journal") {
             override fun onInvalidated(tables:Set<String>) { render(application) }
         })
     }
