@@ -24,7 +24,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val repo = (application as TickmarkApp).repository
-        reportEntry.value=intent.reportEntry()
+        // Restored navigation already contains the user's route after leaving the widget entry.
+        if(savedInstanceState==null) reportEntry.value=intent.reportEntry()
         setContent {
             val entry by reportEntry.collectAsStateWithLifecycle()
             Tickmark(repo,entry) { reportEntry.value=null }
