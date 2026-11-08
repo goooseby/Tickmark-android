@@ -78,9 +78,11 @@ class RefreshWidgetAction:ActionCallback {
     Column(GlanceModifier.fillMaxSize().appWidgetBackground().background(background).cornerRadius(26.dp)
         .clickable(actionStartActivity(intent)).padding(16.dp)) {
         Row(GlanceModifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            Image(ImageProvider(if(away) R.drawable.ic_widget_away else R.drawable.ic_widget_today),null,
-                GlanceModifier.size(17.dp),colorFilter=ColorFilter.tint(accent))
-            Spacer(GlanceModifier.width(7.dp))
+            if(!largeFont || wide) {
+                Image(ImageProvider(if(away) R.drawable.ic_widget_away else R.drawable.ic_widget_today),null,
+                    GlanceModifier.size(17.dp),colorFilter=ColorFilter.tint(accent))
+                Spacer(GlanceModifier.width(7.dp))
+            }
             Text(if(away) "未使用手机" else if(date==LocalDate.now()) "今日用时" else "${date.monthValue}/${date.dayOfMonth} 用时",style=TextStyle(color=ink,fontSize=13.sp,fontWeight=FontWeight.Medium),maxLines=1)
         }
         Spacer(GlanceModifier.height(if(wide) 10.dp else 12.dp))
