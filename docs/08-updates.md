@@ -8,7 +8,7 @@
 
 - applicationId 固定 `io.github.goooseby.tickmark`。
 - 首次公开发布前按用户要求统一包名；源码、测试、组件和安装文件提供器使用相同身份。此前开发包属于独立应用，不承诺覆盖安装或自动继承本地数据，必要时用JSON备份迁移。
-- 版本名称与versionCode仅在用户明确要求时调整，不随日常开发自动递增；本次经用户授权发布0.4.0 / 4。
+- 版本名称与versionCode仅在用户明确要求时调整，不随日常开发自动递增；本次经用户授权发布0.5.0 / 5。
 - 正式版本 tag 为 `v主.次.修订`，如 `v0.2.0`；versionCode 严格递增。
 - 最新版本通过 `GET /repos/goooseby/Tickmark-android/releases/latest` 查询，草稿和预发行不进入默认渠道。
 - 安装包命名 `tickmark-v0.2.0.apk`，使用 GitHub 资产 SHA-256 digest；没有校验信息时只提供发布页，不直接安装。
@@ -38,4 +38,4 @@ GitHub Actions 检查构建与算法测试；手动发布工作流接收版本�
 0.4.0已验证API36模拟器中正式0.3.0覆盖升级，旧复盘在新版记录列表保留；签名、包名及版本校验通过。完整应用内下载与系统安装授权交互仍需单独验证，不能将ADB覆盖安装等同于该流程。详见 [发布验证](validation/README.md)。
 
 
-开发代码已启用R8与资源联合优化；后续发布会随APK保留匹配校验值的r8-mapping.zip，工作流另保存90天映射artifact。本地按APK SHA-256归档映射。已公开0.4.0的资产与校验值未替换，当前版本号不变。见[构建优化](12-release-optimization.md)。
+开发代码已启用R8与资源联合优化；后续发布会随APK保留匹配校验值的r8-mapping.zip，工作流另保存90天映射artifact。本地按APK SHA-256归档映射。0.5.0首次发布优化构建，旧版0.4.0的资产与校验值保持原样。见[构建优化](12-release-optimization.md)。
