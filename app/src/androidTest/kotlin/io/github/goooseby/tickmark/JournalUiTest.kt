@@ -113,7 +113,7 @@ class JournalUiTest {
         compose.onNodeWithText("写下记录").performTextInputSelection(androidx.compose.ui.text.TextRange(body.length))
         android.os.SystemClock.sleep(400) // Settle a soft keyboard if this emulator enables it.
         compose.onNodeWithText("写下记录").performTextInput("\n追加一条计划。")
-        compose.onNodeWithText("写下记录").performTextInputSelection(androidx.compose.ui.text.TextRange(body.length+"\n追加一条计划。".length))
+        compose.onNodeWithText("写下记录").assertTextContains("追加一条计划。",substring=true)
         compose.onNodeWithText("完成").assertIsDisplayed()
         screenshot("journal-long-note-keyboard")
         compose.onNodeWithContentDescription("返回并保存").performClick()
