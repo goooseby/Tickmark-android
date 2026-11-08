@@ -271,7 +271,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     else Box(Modifier.size(36.dp).background(MaterialTheme.colorScheme.secondaryContainer,RoundedCornerShape(8.dp)),contentAlignment=Alignment.Center) { Icon(Icons.Outlined.Apps,null,Modifier.size(22.dp)) }
 }
 @Composable internal fun SessionLine(s: SessionRow, records: Records, from: Long, to: Long, onClick: () -> Unit) {
-    val purpose = records.annotations.firstOrNull { it.purpose.isNotBlank() && it.start <= maxOf(s.start,from) && it.end >= minOf(s.end,to) }?.purpose ?: records.apps.find { it.pkg==s.pkg }?.purpose.orEmpty()
+    val purpose = records.annotations.firstOrNull { it.purpose.isNotBlank() && it.start <= maxOf(s.start,from) && it.end >= minOf(s.end,to) }?.purpose .orEmpty()
     ListItem(headlineContent={ Text(appName(s.pkg,records),maxLines=1,overflow=TextOverflow.Ellipsis) }, supportingContent={ Text("${clock(maxOf(s.start,from))} – ${clock(minOf(s.end,to))}${if(s.ongoing) " · 进行中" else ""}${if(s.inferred) " · 推算" else ""}${if(purpose.isNotBlank()) " · $purpose" else ""}",style=MaterialTheme.typography.bodySmall) }, leadingContent={ AppIcon(s.pkg) }, trailingContent={ Text(duration(overlap(s.start,s.end,from,to)),style=MaterialTheme.typography.labelLarge) }, modifier=Modifier.clickable(onClick=onClick))
 }
 @Composable private fun EmptyState(title:String, body:String) { Column(Modifier.fillMaxWidth().padding(24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) { Text(title,style=MaterialTheme.typography.titleSmall); Text(body,style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant) } }

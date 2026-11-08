@@ -58,8 +58,8 @@ import java.time.*
         item { CompositionChart(records,from,to,onApp) }
         item { ChartTitle("使用时段") }
         item { AppDistribution(records,from,to,onApp) }
-        item { ChartTitle("用途构成") }
-        item { PurposeReport(records,from,to) }
+        item { ChartTitle("应用分类") }
+        item { CategoryReport(records,from,to) }
         item { CoverageNote(records,from,to) }
     }
 }
@@ -121,7 +121,7 @@ import java.time.*
             if(settings) {
                 item { ListItem(headlineContent={ Text("从排行隐藏") },trailingContent={ Switch(app.hidden,onCheckedChange={ onUpdateApp(app.copy(hidden=it)) }) }) }
                 item { ListItem(headlineContent={ Text("停止保存应用明细") },supportingContent={ Text(if(app.excluded) "只保留匿名时段" else "已有明细同时匿名化") },trailingContent={ Switch(app.excluded,onCheckedChange={ if(it) exclude=true else onUpdateApp(app.copy(excluded=false)) }) }) }
-                item { Text("默认用途",Modifier.padding(horizontal=20.dp,vertical=8.dp),style=MaterialTheme.typography.labelLarge); FlowRow(Modifier.padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(6.dp)) { listOf("未分类","学习","课程事务","社交","娱乐","生活","其他").forEach { p -> FilterChip(app.purpose==p || (p=="未分类" && app.purpose.isEmpty()),onClick={ onUpdateApp(app.copy(purpose=if(p=="未分类") "" else p)) },label={ Text(p) }) } } }
+                item { Text("应用分类",Modifier.padding(horizontal=20.dp,vertical=8.dp),style=MaterialTheme.typography.labelLarge); CategoryPicker(app,onUpdateApp) }
                 item { Text(app.pkg,Modifier.padding(20.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }

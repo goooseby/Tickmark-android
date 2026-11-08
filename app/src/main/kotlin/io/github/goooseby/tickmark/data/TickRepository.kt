@@ -30,6 +30,7 @@ import java.util.UUID
 
 class TickRepository(val context: Context, val db: TickDatabase, private val captureEnabled: Boolean = true) {
     val dao = db.dao()
+    private val classifier by lazy { AppClassifier(context) }
     private val mutex = Mutex()
     val syncing = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
@@ -46,11 +47,29 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
     fun hasAccess(): Boolean = context.getSystemService(AppOpsManager::class.java)
         .checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
 
+    private fun appMetadata(packages:Collection<String>,existing:Map<String,AppRow>):List<AppRow> {
+        val manager=context.packageManager
+        val home=manager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),0)?.activityInfo?.packageName
+        return packages.filter{it.isNotEmpty() && !it.startsWith("@")}.distinct().map { pkg ->
+            val old=existing[pkg]
+            val info=runCatching{manager.getApplicationInfo(pkg,0)}.getOrNull()
+            val name=info?.let{manager.getApplicationLabel(it).toString()}
+            val automatic=classifier.classify(pkg,info?.category ?: -1)
+            (old ?: AppRow(pkg,pkg,hidden=pkg==home || pkg=="com.android.systemui" || pkg=="android")).copy(
+                name=if(pkg==home) "桌面" else name ?: old?.name ?: pkg,
+                automaticCategory=if(info==null && automatic==io.github.goooseby.tickmark.engine.analytics.AppCategory.UNKNOWN && !old?.automaticCategory.isNullOrEmpty()) old!!.automaticCategory else automatic.name)
+        }
+    }
+
     suspend fun sync() = withContext(Dispatchers.IO) {
         mutex.withLock {
-            if (!captureEnabled || !hasAccess()) return@withLock
+            if (!captureEnabled) return@withLock
             syncing.value = true
             try {
+                val existing=dao.allApps().associateBy{it.pkg}
+                val refreshed=appMetadata(existing.keys,existing).filter{it!=existing[it.pkg]}
+                if(refreshed.isNotEmpty()) dao.putApps(refreshed)
+                if (!hasAccess()) return@withLock
                 check(context.getSystemService(UserManager::class.java).isUserUnlocked) { "解锁设备后再刷新" }
                 val config = dao.allConfig().associate { it.key to it.value }
                 if (config["paused"] == "true") return@withLock
@@ -86,12 +105,7 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
                     // The public SDK does not expose Activity instance IDs; match package + class.
                     rows += EventRow("${event.timeStamp}:${sequence}", event.timeStamp, kind.name, pkg, cls, 0, sequence++)
                 }
-                val metadata = rows.map { it.pkg }.filter { it.isNotEmpty() && !it.startsWith("@") }.distinct().map { pkg ->
-                    val home = context.packageManager.resolveActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)?.activityInfo?.packageName
-                    val name = runCatching { context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0)).toString() }.getOrNull()
-                    val old = rules[pkg]
-                    (old ?: AppRow(pkg, pkg, hidden = pkg == home || pkg == "com.android.systemui" || pkg == "android")).copy(name = if (pkg == home) "桌面" else name ?: old?.name ?: pkg)
-                }
+                val metadata=appMetadata(rows.map{it.pkg}.filter{it !in rules},rules)
                 val observedAt=System.currentTimeMillis()
                 val interactive=context.getSystemService(PowerManager::class.java).isInteractive
                 val locked=context.getSystemService(KeyguardManager::class.java).isKeyguardLocked
@@ -156,7 +170,8 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
     suspend fun updateApp(app: AppRow) = withContext(Dispatchers.IO) {
         mutex.withLock {
             db.withTransaction {
-                dao.putApps(listOf(app))
+                val current=dao.allApps().find{it.pkg==app.pkg}
+                dao.putApps(listOf(app.copy(automaticCategory=current?.automaticCategory ?: app.automaticCategory)))
                 if (app.excluded) {
                     val raw = dao.events()
                     dao.putEvents(raw.filter { it.pkg == app.pkg }.map { it.copy(pkg = "@excluded", activity = "", instance = 0) })

@@ -104,10 +104,10 @@ class ReportUiTest {
         compose.onNodeWithText("应用管理").performClick()
         compose.onNode(hasSetTextAction()).performTextInput("浏览器")
         compose.onNode(hasText("浏览器") and !hasSetTextAction()).performClick()
-        compose.onNodeWithText("默认用途").assertIsDisplayed()
-        compose.onNodeWithText("学习").performClick()
+        compose.onNodeWithText("应用分类").assertIsDisplayed()
+        compose.onNodeWithText("效率办公").performClick()
         compose.waitForIdle()
-        runBlocking { Assert.assertEquals("学习",repo.dao.allApps().find {it.pkg=="sample.browser"}?.purpose) }
+        runBlocking { Assert.assertEquals("PRODUCTIVITY",repo.dao.allApps().find {it.pkg=="sample.browser"}?.categoryOverride) }
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("每日目标").performClick()
@@ -159,5 +159,23 @@ class ReportUiTest {
         }
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("每日概览").assertIsDisplayed()
+    }
+    @Test fun categoryReportKeepsVideoCategoryRegardlessOfStudyAnnotation() {
+        val date=LocalDate.now().minusDays(1)
+        val start=date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        runBlocking {
+            repo.dao.putApps(listOf(AppRow("tv.danmaku.bili","哔哩哔哩",automaticCategory="MEDIA")))
+            repo.dao.putSessions(listOf(SessionRow("video","tv.danmaku.bili",start,start+1_800_000,false,false)))
+            repo.dao.putSpans(listOf(SpanRow(start,start+1_800_000,"IN_USE")))
+            repo.annotate(AnnotationRow("study",start,start+1_800_000,"学习","个人备注"),false)
+        }
+        compose.runOnUiThread {compose.activity.enableEdgeToEdge()}
+        compose.setContent {Tickmark(repo)}
+        compose.onNodeWithContentDescription("前一天").performClick()
+        compose.onNodeWithText("回顾").performClick()
+        compose.onNodeWithText("日").performClick()
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("影音娱乐"))
+        compose.onNodeWithText("影音娱乐").assertIsDisplayed()
+        screenshot("category-report")
     }
 }

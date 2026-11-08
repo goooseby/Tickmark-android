@@ -17,7 +17,8 @@ class DataTransfer(private val repo: TickRepository) {
             "sessions" to array(d.allSessions()) { obj("id" to it.id, "pkg" to it.pkg, "start" to it.start, "end" to it.end, "inferred" to it.inferred, "ongoing" to it.ongoing) },
             "spans" to array(d.allSpans()) { obj("start" to it.start, "end" to it.end, "state" to it.state) },
             "annotations" to array(d.allAnnotations()) { obj("id" to it.id, "start" to it.start, "end" to it.end, "purpose" to it.purpose, "note" to it.note) },
-            "apps" to array(d.allApps()) { obj("pkg" to it.pkg, "name" to it.name, "hidden" to it.hidden, "excluded" to it.excluded, "purpose" to it.purpose) },
+            "apps" to array(d.allApps()) { obj("pkg" to it.pkg, "name" to it.name, "hidden" to it.hidden, "excluded" to it.excluded, "purpose" to it.purpose,
+                "automaticCategory" to it.automaticCategory,"categoryOverride" to (it.categoryOverride ?: JSONObject.NULL)) },
             "coverage" to array(d.allCoverage()) { obj("start" to it.start, "end" to it.end, "eventCount" to it.eventCount) },
             "config" to array(d.allConfig()) { obj("key" to it.key, "value" to it.value) }).toString(2)
     }
@@ -37,13 +38,18 @@ class DataTransfer(private val repo: TickRepository) {
             read("sessions") { SessionRow(it.getString("id"), it.getString("pkg"), it.getLong("start"), it.getLong("end"), it.getBoolean("inferred"), it.getBoolean("ongoing")) },
             read("spans") { val state = it.getString("state"); io.github.goooseby.tickmark.engine.model.DeviceState.valueOf(state); SpanRow(it.getLong("start"), it.getLong("end"), state) },
             read("annotations") { AnnotationRow(it.getString("id"), it.getLong("start"), it.getLong("end"), it.getString("purpose"), it.getString("note")) },
-            read("apps") { AppRow(it.getString("pkg"), it.getString("name"), it.getBoolean("hidden"), it.getBoolean("excluded"), it.getString("purpose")) },
+            read("apps") { AppRow(it.getString("pkg"), it.getString("name"), it.getBoolean("hidden"), it.getBoolean("excluded"), it.getString("purpose"),
+                it.optString("automaticCategory",""),if(it.has("categoryOverride") && !it.isNull("categoryOverride")) it.getString("categoryOverride") else null) },
             read("coverage") { CoverageRow(it.getLong("start"), it.getLong("end"), it.getInt("eventCount")) },
             read("config") { ConfigRow(it.getString("key"), it.getString("value")) }, root.getString("zoneId"))
         ZoneId.of(result.zone)
         result.sessions.forEach { valid(it.start, it.end) }
         result.spans.forEach { valid(it.start, it.end) }
         result.coverage.forEach { valid(it.start, it.end); require(it.eventCount >= 0) }
+        val categories=io.github.goooseby.tickmark.engine.analytics.AppCategory.entries.map{it.name}.toSet()
+        result.apps.forEach {
+            require((it.automaticCategory.isEmpty() || it.automaticCategory in categories) && (it.categoryOverride==null || it.categoryOverride in categories)) { "备份包含无效应用分类" }
+        }
         result.events.forEach { require(it.time >= 0 && (it.sequence >= 0 || it.kind=="OBSERVE_BOOT" && it.sequence == -1)) }
         result.annotations.forEach { valid(it.start, it.end); require(it.note.length <= 2000 && it.purpose.length <= 40) }
         val purposes = result.annotations.filter { it.purpose.isNotBlank() }.sortedBy { it.start }

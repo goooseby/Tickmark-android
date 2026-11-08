@@ -24,6 +24,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import io.github.goooseby.tickmark.BuildConfig
 import io.github.goooseby.tickmark.data.report.Records
 import io.github.goooseby.tickmark.data.AppRow
+import io.github.goooseby.tickmark.data.appCategory
 import io.github.goooseby.tickmark.update.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -34,7 +35,7 @@ import java.time.format.DateTimeFormatter
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=20.dp)) {
         item { SettingsSection("使用与复盘") }
         item { SettingsLink("每日目标",records.config["dailyGoalMinutes"]?.toIntOrNull()?.takeIf { it>0 }?.let { "每天 ${duration(it*60_000L)}" } ?: "设置自己合适的用时目标",Icons.Outlined.Flag) { onNavigate("goals") } }
-        item { SettingsLink("应用管理","默认用途、排行显示与隐私排除",Icons.Outlined.Apps) { onNavigate("apps") } }
+        item { SettingsLink("应用管理","应用分类、排行显示与隐私排除",Icons.Outlined.Apps) { onNavigate("apps") } }
         item { SettingsLink("外观",when(records.config["theme"]) { "light"->"浅色"; "dark"->"深色"; else->"跟随系统" },Icons.Outlined.Palette) { onNavigate("appearance") } }
         item { SettingsLink("桌面组件","今日用时与未使用时段",Icons.Outlined.Widgets) { onNavigate("widgets") } }
         item { SettingsSection("采集与数据") }
@@ -59,7 +60,7 @@ import java.time.format.DateTimeFormatter
         Row(Modifier.padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf("全部","已隐藏","已排除").forEachIndexed { i,label -> FilterChip(filter==i,onClick={filter=i},label={Text(label)}) } }
         LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(bottom=20.dp)) {
             if(apps.isEmpty()) item { EmptyReport(if(query.isNotBlank() || filter!=0) "没有匹配的应用" else "采集到应用记录后会显示在这里") }
-            items(apps,key={it.pkg}) { app -> ListItem(headlineContent={Text(app.name,maxLines=1,overflow=TextOverflow.Ellipsis)},supportingContent={Text(listOfNotNull(app.purpose.ifEmpty { "未分类" },if(app.hidden) "排行隐藏" else null,if(app.excluded) "已排除明细" else null).joinToString(" · "))},leadingContent={AppIcon(app.pkg)},modifier=Modifier.clickable {onApp(app)}) }
+            items(apps,key={it.pkg}) { app -> ListItem(headlineContent={Text(app.name,maxLines=1,overflow=TextOverflow.Ellipsis)},supportingContent={Text(listOfNotNull(app.appCategory.title,if(app.hidden) "排行隐藏" else null,if(app.excluded) "已排除明细" else null).joinToString(" · "))},leadingContent={AppIcon(app.pkg)},modifier=Modifier.clickable {onApp(app)}) }
         }
     }
 }
@@ -69,8 +70,8 @@ import java.time.format.DateTimeFormatter
     var saved by remember { mutableStateOf(false) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=24.dp)) {
         item { Row(Modifier.padding(20.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) { AppIcon(app.pkg); Text(app.name,style=MaterialTheme.typography.titleMedium) } }
-        item { SettingsSection("默认用途") }
-        item { FlowRow(Modifier.padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf("未分类","学习","课程事务","社交","娱乐","生活","其他").forEach { p->FilterChip(app.purpose==p || (p=="未分类" && app.purpose.isEmpty()),onClick={onUpdate(app.copy(purpose=if(p=="未分类") "" else p))},label={Text(p)}) } } }
+        item { SettingsSection("应用分类") }
+        item { CategoryPicker(app,onUpdate) }
         item { SettingsSection("每日用时目标") }
         item { Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(budget,{if(it.length<=4 && it.all(Char::isDigit)) {budget=it;saved=false}},label={Text("分钟（留空关闭）")},singleLine=true,keyboardOptions=androidx.compose.foundation.text.KeyboardOptions(keyboardType=androidx.compose.ui.text.input.KeyboardType.Number))

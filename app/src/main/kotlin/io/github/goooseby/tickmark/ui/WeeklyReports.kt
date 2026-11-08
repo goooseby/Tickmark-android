@@ -48,8 +48,8 @@ private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) =
         item { CompositionChart(records,bounds.first(),until,onApp) }
         item { ChartTitle("一周时段分布") }
         item { WeekHeatmap(records,monday,onSelect=onRange) }
-        item { ChartTitle("整周用途构成") }
-        item { PurposeReport(records,bounds.first(),until) }
+        item { ChartTitle("整周应用分类") }
+        item { CategoryReport(records,bounds.first(),until) }
         item { Text("已记录日期只表示有状态依据；部分日期可能缺少记录。",Modifier.padding(horizontal=20.dp,vertical=12.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }

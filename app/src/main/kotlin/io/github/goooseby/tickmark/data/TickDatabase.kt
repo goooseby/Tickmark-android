@@ -12,7 +12,9 @@ data class SpanRow(@PrimaryKey val start: Long, val end: Long, val state: String
 @Entity(tableName = "annotations")
 data class AnnotationRow(@PrimaryKey val id: String, val start: Long, val end: Long, val purpose: String, val note: String)
 @Entity(tableName = "metadata")
-data class AppRow(@PrimaryKey val pkg: String, val name: String, val hidden: Boolean = false, val excluded: Boolean = false, val purpose: String = "")
+data class AppRow(@PrimaryKey val pkg: String, val name: String, val hidden: Boolean = false, val excluded: Boolean = false, val purpose: String = "",
+    @ColumnInfo(defaultValue = "''") val automaticCategory:String = "",
+    @ColumnInfo(defaultValue = "NULL") val categoryOverride:String? = null)
 @Entity(tableName = "config")
 data class ConfigRow(@PrimaryKey val key: String, val value: String)
 @Entity(tableName = "coverage")
@@ -54,5 +56,11 @@ interface TickDao {
     @Query("DELETE FROM config") suspend fun deleteConfig()
     @Query("DELETE FROM coverage") suspend fun deleteCoverage()
 }
-@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class], version = 1, exportSchema = false)
+val MIGRATION_1_2=object:androidx.room.migration.Migration(1,2) {
+    override fun migrate(db:androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE metadata ADD COLUMN automaticCategory TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE metadata ADD COLUMN categoryOverride TEXT DEFAULT NULL")
+    }
+}
+@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class], version = 2, exportSchema = false)
 abstract class TickDatabase : RoomDatabase() { abstract fun dao(): TickDao }

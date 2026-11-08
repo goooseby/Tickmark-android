@@ -10,7 +10,7 @@ import io.github.goooseby.tickmark.widget.WidgetCoordinator
 import java.util.concurrent.TimeUnit
 
 class TickmarkApp : Application() {
-    val repository by lazy { TickRepository(this, Room.databaseBuilder(this, TickDatabase::class.java, "tickmark.db").build()) }
+    val repository by lazy { TickRepository(this, Room.databaseBuilder(this, TickDatabase::class.java, "tickmark.db").addMigrations(MIGRATION_1_2).build()) }
     val updates by lazy { UpdateController(this) }
     override fun onConfigurationChanged(newConfig:android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)

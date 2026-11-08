@@ -1,0 +1,10 @@
+{
+  "MEDIA": ["tv.danmaku.bili", "com.bilibili.app.in", "com.ss.android.ugc.aweme", "com.ss.android.ugc.aweme.lite", "com.smile.gifmaker", "com.kuaishou.nebula", "com.tencent.qqlive", "com.qiyi.video", "com.youku.phone", "com.google.android.youtube", "com.netease.cloudmusic", "com.tencent.qqmusic", "com.spotify.music"],
+  "SOCIAL": ["com.tencent.mm", "com.tencent.mobileqq", "com.sina.weibo", "com.xingin.xhs", "com.instagram.android", "com.twitter.android", "org.telegram.messenger", "com.whatsapp", "com.discord"],
+  "EDUCATION": ["com.duolingo", "com.youdao.dict", "com.kingsoft", "com.chaoxing.mobile", "com.zhihuishu.qiaozhi", "com.netease.edu.ucmooc", "com.anki.lite", "com.ichi2.anki"],
+  "PRODUCTIVITY": ["com.tencent.wework", "com.alibaba.android.rimet", "com.ss.android.lark", "com.microsoft.teams", "com.microsoft.office.word", "com.microsoft.office.excel", "com.microsoft.office.powerpoint", "cn.wps.moffice_eng", "notion.id", "md.obsidian", "com.ticktick.task"],
+  "LIFE": ["com.taobao.taobao", "com.jingdong.app.mall", "com.xunmeng.pinduoduo", "com.sankuai.meituan", "me.ele", "com.eg.android.AlipayGphone"],
+  "NEWS": ["com.ss.android.article.news", "com.netease.newsreader.activity", "com.tencent.news", "com.dragon.read", "com.tencent.weread", "com.amazon.kindle"],
+  "MAPS": ["com.autonavi.minimap", "com.baidu.BaiduMap", "com.google.android.apps.maps", "com.MobileTicket", "com.sdu.didi.psnger"],
+  "TOOLS": ["com.android.chrome", "com.microsoft.emmx", "org.mozilla.firefox", "com.quark.browser", "com.baidu.searchbox", "com.android.settings", "com.deepseek.chat", "com.openai.chatgpt"]
+}

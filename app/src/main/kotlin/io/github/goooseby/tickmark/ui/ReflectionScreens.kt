@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.goooseby.tickmark.data.report.Records
+import io.github.goooseby.tickmark.data.appCategory
 import io.github.goooseby.tickmark.engine.analytics.*
 import io.github.goooseby.tickmark.engine.model.Session
 import io.github.goooseby.tickmark.engine.model.overlap
@@ -62,17 +63,17 @@ import java.time.LocalDate
         LinearProgressIndicator(progress={(used.toFloat()/(goal*60_000)).coerceIn(0f,1f)},modifier=Modifier.fillMaxWidth(),drawStopIndicator={})
     }
 }
-@Composable internal fun PurposeReport(records:Records,from:Long,to:Long) {
-    val totals=remember(records.sessions,records.spans,records.annotations,records.apps,from,to) {
-        PurposeEngine.totals(records.sessions.map {Session(it.pkg,it.start,it.end,it.inferred,it.ongoing)},records.deviceReport(from,to).spans.filter{it.state==io.github.goooseby.tickmark.engine.model.DeviceState.IN_USE}.map{it.start to it.end},records.annotations.map{PurposeRange(it.start,it.end,it.purpose)},records.apps.associate{it.pkg to it.purpose},from,to)
+@Composable internal fun CategoryReport(records:Records,from:Long,to:Long) {
+    val totals=remember(records.sessions,records.apps,from,to) {
+        CategoryEngine.totals(visibleSessions(records).map {Session(it.pkg,it.start,it.end,it.inferred,it.ongoing)},records.apps.associate{it.pkg to it.appCategory},from,to)
     }
     if(totals.isEmpty()) {EmptyReport("暂无可分类的手机用时");return}
     Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-        totals.forEach { (purpose,amount)->
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(purpose,style=MaterialTheme.typography.bodyMedium);Text(duration(amount),style=MaterialTheme.typography.bodyMedium)}
-            LinearProgressIndicator(progress={amount.toFloat()/totals.sumOf{it.second}},modifier=Modifier.fillMaxWidth().height(6.dp),color=reportColor(purpose),drawStopIndicator={})
+        totals.forEach { (category,amount)->
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(category.title,style=MaterialTheme.typography.bodyMedium);Text(duration(amount),style=MaterialTheme.typography.bodyMedium)}
+            LinearProgressIndicator(progress={amount.toFloat()/totals.sumOf{it.second}},modifier=Modifier.fillMaxWidth().height(6.dp),color=reportColor(category.name),drawStopIndicator={})
         }
-        StatisticsInfoButton("用途统计说明","用途优先使用你的时段标注，再使用应用的默认用途。只分配已确认的手机使用时间；多个不同用途的应用同时活跃时计入“并发用途”，不会重复累加。未标注的记录保留为未分类。")
+        StatisticsInfoButton("应用分类统计说明","按应用所属类别汇总前台用时，包含应用图表中的推算片段；时段标注不改变应用类别。分屏应用分别计时，合计可能超过手机使用时长。隐藏和隐私排除的应用不参与，无法识别的应用保留未分类。")
     }
 }
 @Composable internal fun DataSettings(bytes:Long,lastBackup:String?,onBackup:()->Unit,onExport:()->Unit,onRestore:()->Unit,onClear:()->Unit) {
