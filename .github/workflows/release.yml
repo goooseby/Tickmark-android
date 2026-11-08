@@ -46,11 +46,24 @@ jobs:
       - name: Verify and prepare files
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk
+          test -s app/build/outputs/mapping/release/mapping.txt
           mkdir -p release
           cp app/build/outputs/apk/release/app-release.apk "release/tickmark-v$VERSION.apk"
           cd release
           sha256sum "tickmark-v$VERSION.apk" > SHA256SUMS.txt
           python -c 'import json,os; json.dump({"versionName":os.environ["VERSION"],"versionCode":int(os.environ["VERSION_CODE"])},open("update.json","w"))'
+          cd ..
+          python -m zipfile -c "release/tickmark-v$VERSION-r8-mapping.zip" app/build/outputs/mapping/release release/SHA256SUMS.txt release/update.json
+      - name: Archive R8 mapping for this APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: tickmark-v${{ inputs.version }}-r8-mapping
+          path: |
+            app/build/outputs/mapping/release/
+            release/SHA256SUMS.txt
+            release/update.json
+          if-no-files-found: error
+          retention-days: 90
       - name: Create draft with release notes
         run: |
           if [ -f "docs/releases/$VERSION.md" ]; then

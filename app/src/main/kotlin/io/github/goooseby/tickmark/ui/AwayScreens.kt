@@ -84,13 +84,14 @@ internal const val AWAY_INFO="这里统计有息屏或锁屏依据的时段，�
     val locked=MaterialTheme.colorScheme.tertiary
     val used=MaterialTheme.colorScheme.outlineVariant
     val unknown=MaterialTheme.colorScheme.surfaceContainerHighest
+    val reveal by chartReveal(report)
     Column(Modifier.padding(horizontal=20.dp)) {
         Canvas(Modifier.fillMaxWidth().height(64.dp).semantics{contentDescription="息屏${duration(report.screenOff)}，锁屏${duration(report.locked)}，记录空档${duration(report.unknown)}"}) {
             val range=(report.until-report.from).coerceAtLeast(1)
             report.spans.forEach { span ->
                 val x=(span.start-report.from).toFloat()/range*size.width
                 val width=(span.end-span.start).toFloat()/range*size.width
-                drawRect(when(span.state){DeviceState.SCREEN_OFF->off;DeviceState.LOCKED->locked;DeviceState.IN_USE->used;else->unknown},Offset(x,0f),Size(width,size.height))
+                drawRect(when(span.state){DeviceState.SCREEN_OFF->off;DeviceState.LOCKED->locked;DeviceState.IN_USE->used;else->unknown},Offset(x,0f),Size(width,size.height),alpha=reveal)
             }
         }
         val crossesDate=Instant.ofEpochMilli(report.until).atZone(ZoneId.systemDefault()).toLocalDate()>

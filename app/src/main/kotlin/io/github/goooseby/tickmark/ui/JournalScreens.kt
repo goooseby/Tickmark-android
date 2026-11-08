@@ -118,7 +118,7 @@ internal fun journalDate(date:LocalDate):String="${date.monthValue}月${date.day
                                 DropdownMenuItem(text={Text(if(row.pinned) "取消置顶" else "置顶")},onClick={menu=false;onPin(row)})
                                 DropdownMenuItem(text={Text("删除")},onClick={menu=false;deleting=row})
                             }
-                        }},modifier=Modifier.clickable{onOpen(row)})
+                        }},modifier=Modifier.animateItem().clickable{onOpen(row)})
                 }
             }
         }
@@ -206,7 +206,7 @@ private val journalSaver=Saver<JournalRow,String>(save={JournalCodec.encode(it).
         }
     }
     BackHandler {leave(false)}
-    Scaffold(topBar={TopAppBar(title={Text(if(row.kind=="DAILY") "每日复盘" else "随手记",maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={IconButton(onClick={leave(false)},enabled=!saving){Icon(Icons.AutoMirrored.Outlined.ArrowBack,"返回并保存")}},actions={
+    Scaffold(modifier=Modifier.pageEntry(initial.id),topBar={TopAppBar(title={Text(if(row.kind=="DAILY") "每日复盘" else "随手记",maxLines=1,overflow=TextOverflow.Ellipsis)},navigationIcon={IconButton(onClick={leave(false)},enabled=!saving){Icon(Icons.AutoMirrored.Outlined.ArrowBack,"返回并保存")}},actions={
         if(loaded && row.meaningful) IconButton(onClick={
             context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain").putExtra(android.content.Intent.EXTRA_TEXT,row.shareText),"分享记录"))
         }) {Icon(Icons.Outlined.Share,"分享记录")}

@@ -21,4 +21,4 @@ jobs:
       - uses: android-actions/setup-android@v4.0.4
       - uses: gradle/actions/setup-gradle@v6.4.1
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - run: ./gradlew :engine:test :app:assembleDebug :app:lintDebug --console=plain
+      - run: ./gradlew :engine:test :app:assembleDebug :app:lintDebug :app:assembleRelease :app:lintRelease --console=plain

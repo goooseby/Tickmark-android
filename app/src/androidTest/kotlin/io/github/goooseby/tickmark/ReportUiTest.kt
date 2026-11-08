@@ -50,6 +50,8 @@ class ReportUiTest {
     @After fun close() { compose.activityRule.scenario.close();db.close() }
     private fun screenshot(name:String) {
         compose.waitForIdle()
+        compose.onRoot().captureToImage()
+        android.os.SystemClock.sleep(400) // Let the real window/IME frame reach the screenshot surface.
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val bitmap=instrumentation.uiAutomation.takeScreenshot()
         val directory=File(instrumentation.targetContext.getExternalFilesDir(null),"validation").apply { mkdirs() }

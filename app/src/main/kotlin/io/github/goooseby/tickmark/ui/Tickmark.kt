@@ -2,6 +2,11 @@
 package io.github.goooseby.tickmark.ui
 
 import android.content.Intent
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import io.github.goooseby.tickmark.share.ShareFiles
+import io.github.goooseby.tickmark.share.ReportImage
+import io.github.goooseby.tickmark.share.ReportImageData
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -57,6 +62,11 @@ import kotlinx.coroutines.withContext
 import java.time.*
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+
+private data class ReportPage(val tab:Int,val settings:String?,val detail:String?,val date:LocalDate,val reviewWeek:Boolean,val weekly:Boolean,val from:Long,val to:Long,val filtered:Boolean) {
+    val depth:Int get()=if(settings?.startsWith("app:")==true) 2 else if(settings!=null || detail!=null) 1 else 0
+    val routeKey:String get()=settings?.let{"settings:$it"} ?: detail?.let{"detail:$it"} ?: "tab:$tab"
+}
 
 private val purposes = listOf("学习", "课程事务", "社交", "娱乐", "生活", "其他")
 fun duration(ms: Long): String {
@@ -137,11 +147,33 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     val snack = remember { SnackbarHostState() }
     val transfer = remember { DataTransfer(repo) }
     val paused = records.config["paused"] == "true"
+    var preparingShare by remember{mutableStateOf(false)}
     fun task(block: suspend () -> Unit) { scope.launch { try { block() } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; snack.showSnackbar(e.message ?: "操作失败，原记录已保留") } } }
     fun deletedJournal(row:JournalRow?) {
         if(row!=null) task {
             if(snack.showSnackbar("记录已删除",actionLabel="撤销",duration=SnackbarDuration.Long)==SnackbarResult.ActionPerformed) repo.restoreJournal(row)
         }
+    }
+    fun shareFile(csv:Boolean) {
+        if(preparingShare) return
+        preparingShare=true
+        task {try {
+            val uri=withContext(Dispatchers.IO) {
+                ShareFiles.text(context,if(csv) "Tickmark-sessions-${LocalDate.now()}.csv" else "Tickmark-${LocalDate.now()}.json",if(csv) transfer.csv() else transfer.backup())
+            }
+            ShareFiles.launch(context,ShareFiles.intent(uri,if(csv) "text/csv" else "application/json",if(csv) "Tickmark 会话表" else "Tickmark 备份"))
+        } finally {preparingShare=false}}
+    }
+    fun shareReport(week:Boolean) {
+        if(preparingShare) return
+        preparingShare=true
+        val snapshot=records;val anchor=date
+        task {try {
+            val data=withContext(Dispatchers.Default){ReportImageData.create(snapshot,anchor,week)}
+            val bitmap=withContext(Dispatchers.Default){ReportImage.render(context,data)}
+            val uri=try {withContext(Dispatchers.IO){ShareFiles.image(context,data.filename,bitmap)}} finally {bitmap.recycle()}
+            ShareFiles.launch(context,ShareFiles.intent(uri,"image/png","${data.title} · 使用${if(week) "周报" else "日报"}","Tickmark · ${data.title}\n${ShareFiles.PROJECT_URL}"))
+        } finally {preparingShare=false}}
     }
     val exportJson = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) task { withContext(Dispatchers.IO) { val text = transfer.backup(); context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray()) } ?: error("无法写入文件") }; snack.showSnackbar("备份已保存") }
@@ -179,6 +211,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     }
     val colors = if (dark) darkColorScheme(primary = Color(0xFFADC6FF)) else lightColorScheme(primary = Color(0xFF315DA8), secondary = Color(0xFF53627C), surface = Color(0xFFF9F9FF))
     MaterialTheme(colorScheme = colors) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if(journalEditor!=null) {
             key(journalEditor.id) {JournalEditor(repo,records,journalEditor,onClose={back()},onDate=::openDaily,onDeleted={removed->back();deletedJournal(removed)})}
         } else {
@@ -186,12 +219,16 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
         val weekBounds = ReportEngine.weekBoundaries(date,ZoneId.systemDefault())
         val from = rangeStart ?: if(weekly) weekBounds.first() else dayStart(date)
         val to = minOf(rangeEnd ?: if(weekly) weekBounds.last() else dayStart(date.plusDays(1)), System.currentTimeMillis())
-        val selected = records.sessions.filter { it.start < to && it.end > from }
-        val title = when { settingsRoute!=null -> when { settingsRoute!!.startsWith("app:")->records.apps.find{it.pkg==settingsRoute!!.removePrefix("app:")}?.name ?: "应用设置"; else->mapOf("apps" to "应用管理","goals" to "每日目标","appearance" to "外观","capture" to "采集状态","data" to "数据管理","updates" to "版本与更新","privacy" to "隐私说明","project" to "项目与反馈","widgets" to "桌面组件")[settingsRoute] ?: "设置" }; detail=="@away"->"未使用时段"; detail=="@journal"->"每日复盘"; detail == "@range" -> "时段复盘"; detail != null -> appName(detail!!, records); tab == 0 -> if (date == LocalDate.now()) "今日" else "每日概览"; tab == 1 -> "回顾"; tab == 2 -> "记录"; else -> "设置" }
+            val title = when { settingsRoute!=null -> when { settingsRoute!!.startsWith("app:")->records.apps.find{it.pkg==settingsRoute!!.removePrefix("app:")}?.name ?: "应用设置"; else->mapOf("apps" to "应用管理","goals" to "每日目标","appearance" to "外观","capture" to "采集状态","data" to "数据管理","updates" to "版本与更新","privacy" to "隐私说明","project" to "项目与反馈","widgets" to "桌面组件")[settingsRoute] ?: "设置" }; detail=="@away"->"未使用时段"; detail=="@journal"->"每日复盘"; detail == "@range" -> "时段复盘"; detail != null -> appName(detail!!, records); tab == 0 -> if (date == LocalDate.now()) "今日" else "每日概览"; tab == 1 -> "回顾"; tab == 2 -> "记录"; else -> "设置" }
         Scaffold(
-            topBar = { TopAppBar(title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = {
+            topBar = { TopAppBar(title = { Crossfade(title,animationSpec=tween(180),label="page-title") {Text(it,maxLines=1,overflow=TextOverflow.Ellipsis)} }, navigationIcon = {
                 if (settingsRoute!=null || detail != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回") }
             }, actions = {
+                if(tab in 0..1 && detail==null) {
+                    IconButton(onClick={shareReport(weekly)},enabled=!preparingShare) {
+                        if(preparingShare) CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp) else Icon(Icons.Outlined.Share,"分享${if(weekly) "每周" else "每日"}概览")
+                    }
+                }
                 if (tab in 0..1 && detail == null) IconButton(onClick = { vm.sync() }, enabled = !syncing) { Icon(Icons.Outlined.Refresh, "刷新") }
             }) },
             bottomBar = { if (settingsRoute==null && detail == null) NavigationBar {
@@ -206,8 +243,18 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
                     else TextButton(onClick={ context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },modifier=Modifier.fillMaxWidth()) { Text("采集已暂停 · 恢复访问权限") }
                 }
                 if (paused && tab in 0..1 && journalEditor==null) TextButton(onClick = { task { repo.setPaused(false); vm.sync() } }, modifier = Modifier.fillMaxWidth()) { Text("采集已暂停 · 点此继续") }
+                AnimatedContent(
+                    targetState=ReportPage(tab,settingsRoute,detail,date,reviewWeek,weekly,from,to,rangeStart!=null),
+                    contentKey={it.routeKey},modifier=Modifier.weight(1f).fillMaxWidth().pageEntry(Unit),
+                    transitionSpec={
+                        val direction=if(targetState.depth<initialState.depth || targetState.depth==0 && targetState.tab<initialState.tab) -1 else 1
+                        (fadeIn(tween(210,delayMillis=70))+slideInHorizontally(tween(280)){direction*it/24}) togetherWith
+                            (fadeOut(tween(100))+slideOutHorizontally(tween(180)){-direction*it/40}) using SizeTransform(clip=true)
+                    },label="page-navigation"
+                ) {page ->
+                Box(Modifier.fillMaxSize().destinationInput(page.tab==tab && page.settings==settingsRoute && page.detail==detail)) {
                 when {
-                    settingsRoute!=null -> when(val route=settingsRoute!!) {
+                    page.settings!=null -> when(val route=page.settings) {
                         "apps" -> AppManager(records) { settingsRoute="app:${it.pkg}" }
                         "goals" -> GoalSettings(records) { value->task { repo.setConfig("dailyGoalMinutes" to value) } }
                         "appearance" -> AppearanceSettings(records.config["theme"] ?: "system") { value->task { repo.setConfig("theme" to value) } }
@@ -218,26 +265,30 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
                         "widgets" -> WidgetSettings(records,access)
                         "data" -> {
                             val bytes by produceState(0L,records.config["lastSync"]) { value=withContext(Dispatchers.IO) { val db=context.getDatabasePath("tickmark.db");db.length()+java.io.File(db.path+"-wal").length() } }
-                            DataSettings(bytes,null,onBackup={exportJson.launch("Tickmark-${LocalDate.now()}.json")},onExport={exportCsv.launch("Tickmark-sessions-${LocalDate.now()}.csv")},onRestore={importJson.launch(arrayOf("application/json","text/plain","application/octet-stream"))},onClear={clear=true})
+                            DataSettings(bytes,null,onBackup={shareFile(false)},onExport={shareFile(true)},onRestore={importJson.launch(arrayOf("application/json","text/plain","application/octet-stream"))},onClear={clear=true},onSaveBackup={exportJson.launch("Tickmark-${LocalDate.now()}.json")},onSaveExport={exportCsv.launch("Tickmark-sessions-${LocalDate.now()}.csv")},busy=preparingShare)
                         }
                         else -> records.apps.find{it.pkg==route.removePrefix("app:")}?.let { app->AppPreferences(app,records.config,onUpdate={task{repo.updateApp(it)}},onSaveGoal={value->task{repo.setConfig("appGoal:${app.pkg}" to value)}}) }
                     }
-                    detail=="@away" -> AwayPage(records,from,to) { a,b -> annotation=AnnotationRow(UUID.randomUUID().toString(),a,b,"","") }
-                    detail != null -> DetailReports(detail!!, records, selected, from, to, onApp = { parentDetail = detail; detail = it }, onAnnotate = { annotation = AnnotationRow(UUID.randomUUID().toString(), from, to, "", "") }, onEdit = { annotation = it }, onUpdateApp = { task { repo.updateApp(it) } }, onDate = { if(weekly) { weekReturnAnchor=dateString; weekReturnDetail=detail }; dateString = it.toString(); reviewWeek = false; rangeStart = null; rangeEnd = null }, weekly = weekly)
-                    tab == 3 -> SettingsHome(records,access,::openSettings)
-                    tab == 2 -> journalState.SaveableStateProvider("journal-hub") {JournalHub(records,onOpen=::openJournal,onDaily=::openDaily,onNote={openJournal(JournalRow.note(LocalDate.now()))},onPin={row->task{repo.pinJournal(row.id)}},onDelete={row->task{deletedJournal(repo.deleteJournal(row.id))}},onAction={row->task{repo.toggleJournalAction(row.id)}})}
-                    else -> {
-                        if(tab==1) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=4.dp)) {
-                            listOf("日","周").forEachIndexed { index,label -> SegmentedButton(selected=reviewWeek==(index==1),onClick={ reviewWeek=index==1; rangeStart=null; rangeEnd=null },shape=SegmentedButtonDefaults.itemShape(index,2)) { Text(label) } }
+                    page.detail=="@away" -> AwayPage(records,page.from,page.to) { a,b -> annotation=AnnotationRow(UUID.randomUUID().toString(),a,b,"","") }
+                    page.detail != null -> DetailReports(page.detail, records, records.sessions.filter{it.start<page.to && it.end>page.from}, page.from, page.to, onApp = { parentDetail = detail; detail = it }, onAnnotate = { annotation = AnnotationRow(UUID.randomUUID().toString(), from, to, "", "") }, onEdit = { annotation = it }, onUpdateApp = { task { repo.updateApp(it) } }, onDate = { if(weekly) { weekReturnAnchor=dateString; weekReturnDetail=detail }; dateString = it.toString(); reviewWeek = false; rangeStart = null; rangeEnd = null }, weekly = page.weekly)
+                    page.tab == 3 -> SettingsHome(records,access,::openSettings)
+                    page.tab == 2 -> journalState.SaveableStateProvider("journal-hub") {JournalHub(records,onOpen=::openJournal,onDaily=::openDaily,onNote={openJournal(JournalRow.note(LocalDate.now()))},onPin={row->task{repo.pinJournal(row.id)}},onDelete={row->task{deletedJournal(repo.deleteJournal(row.id))}},onAction={row->task{repo.toggleJournalAction(row.id)}})}
+                    else -> Column(Modifier.fillMaxSize()) {
+                        if(page.tab==1) SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=4.dp)) {
+                            listOf("日","周").forEachIndexed { index,label -> SegmentedButton(selected=page.reviewWeek==(index==1),onClick={ reviewWeek=index==1; rangeStart=null; rangeEnd=null },shape=SegmentedButtonDefaults.itemShape(index,2)) { Text(label) } }
                         }
-                        DateRow(date, onPrevious = { dateString = date.minusDays(if(tab==1 && reviewWeek) 7 else 1).toString() }, onNext = { dateString = date.plusDays(if(tab==1 && reviewWeek) 7 else 1).coerceAtMost(LocalDate.now()).toString() }, onChoose = { showDate = true }, onToday = { dateString = LocalDate.now().toString() }, weekly=tab==1 && reviewWeek)
-                        if (tab == 0) TodayReports(records, date, from, to, rangeStart != null,
+                        DateRow(page.date, onPrevious = { dateString = page.date.minusDays(if(page.tab==1 && page.reviewWeek) 7 else 1).toString() }, onNext = { dateString = page.date.plusDays(if(page.tab==1 && page.reviewWeek) 7 else 1).coerceAtMost(LocalDate.now()).toString() }, onChoose = { showDate = true }, onToday = { dateString = LocalDate.now().toString() }, weekly=page.tab==1 && page.reviewWeek)
+                        Box(Modifier.weight(1f).fillMaxWidth().pageEntry(listOf(page.date,page.reviewWeek))) {
+                        if (page.tab == 0) TodayReports(records, page.date, page.from, page.to, page.filtered,
                             onHour = { hour -> val z = ZoneId.systemDefault(); rangeStart = date.atTime(hour,0).atZone(z).toInstant().toEpochMilli(); rangeEnd = date.atTime(hour,0).plusHours(1).atZone(z).toInstant().toEpochMilli() },
                             onClearRange = { rangeStart = null; rangeEnd = null }, onRange = { showRange = true }, onDetail = { detail = "@range" },
                             onApp = { s -> detail = s.pkg }, onEdit = { annotation = it }, onGoal={openSettings("goals")},onJournal=::openDaily,onAway={detail="@away"},onJournalAction={row->task{repo.toggleJournalAction(row.id)}})
-                        else if(reviewWeek) WeeklyReports(records,date,onJournal=::openDaily,onApp={ detail=it },onDay={ weekReturnAnchor=dateString; weekReturnDetail=null; dateString=it.toString(); reviewWeek=false; rangeStart=null; rangeEnd=null },onRange={ a,b -> weekReturnAnchor=dateString; weekReturnDetail=null; dateString=Instant.ofEpochMilli(a).atZone(ZoneId.systemDefault()).toLocalDate().toString(); reviewWeek=false; rangeStart=a; rangeEnd=b; detail="@range" })
-                        else ReviewReports(records, date, from, to, onApp = { detail = it }, onRange = { showRange = true }, onDate = { dateString = it.toString(); rangeStart = null; rangeEnd = null })
+                        else if(page.reviewWeek) WeeklyReports(records,page.date,onJournal=::openDaily,onApp={ detail=it },onDay={ weekReturnAnchor=dateString; weekReturnDetail=null; dateString=it.toString(); reviewWeek=false; rangeStart=null; rangeEnd=null },onRange={ a,b -> weekReturnAnchor=dateString; weekReturnDetail=null; dateString=Instant.ofEpochMilli(a).atZone(ZoneId.systemDefault()).toLocalDate().toString(); reviewWeek=false; rangeStart=a; rangeEnd=b; detail="@range" })
+                        else ReviewReports(records, page.date, page.from, page.to, onApp = { detail = it }, onRange = { showRange = true }, onDate = { dateString = it.toString(); rangeStart = null; rangeEnd = null })
+                        }
                     }
+                }
+                }
                 }
             }
         }
@@ -249,6 +300,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
         annotation?.let { row -> AnnotationDialog(row, onDismiss = { annotation = null }, onDelete = { task { repo.deleteAnnotation(row.id); annotation = null } }, onSave = { new,replace -> repo.annotate(new, replace) }, onDone = { annotation = null }) }
         preview?.let { data -> AlertDialog(onDismissRequest = { preview = null }, title = { Text("替换本地数据？") }, text = { Text("备份含 ${data.sessions.size} 条会话、${data.annotations.size} 条标注、${data.journal.size}条记录。\n时区：${data.zone}\n\n当前数据将被替换。恢复后暂停采集，可在设置中继续。") }, confirmButton = { TextButton(onClick = { task { transfer.restore(data); preview = null; snack.showSnackbar("已恢复，采集已暂停") } }) { Text("替换并恢复") } }, dismissButton = { TextButton(onClick = { preview = null }) { Text("取消") } }) }
         if (clear) AlertDialog(onDismissRequest = { clear = false }, title = { Text("清空全部记录？") }, text = { Text("会话、标注、记录和设置将被删除。重新采集只记录清空之后的事件，旧记录不会回填。") }, confirmButton = { TextButton(onClick = { task { repo.clear(false); clear = false; vm.sync() } }) { Text("清空并重新采集") } }, dismissButton = { Column { TextButton(onClick = { task { repo.clear(true); clear = false } }) { Text("清空并暂停") }; TextButton(onClick = { clear = false }) { Text("取消") } } })
+        }
         }
     }
 }
@@ -265,7 +317,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     val current=if(weekly) week==ReportEngine.weekStart(LocalDate.now()) else date==LocalDate.now()
     Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onPrevious) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowLeft, if(weekly) "上一周" else "前一天") }
-        TextButton(onClick = onChoose, modifier = Modifier.weight(1f)) { Text(if(weekly) "${week.monthValue}/${week.dayOfMonth} – ${week.plusDays(6).monthValue}/${week.plusDays(6).dayOfMonth}" else date.format(DateTimeFormatter.ofPattern("M月d日 EEEE", java.util.Locale.SIMPLIFIED_CHINESE)), maxLines = 1) }
+        TextButton(onClick = onChoose, modifier = Modifier.weight(1f)) { AnimatedContent(targetState=if(weekly) "${week.monthValue}/${week.dayOfMonth} – ${week.plusDays(6).monthValue}/${week.plusDays(6).dayOfMonth}" else date.format(DateTimeFormatter.ofPattern("M月d日 EEEE", java.util.Locale.SIMPLIFIED_CHINESE)),transitionSpec={fadeIn(tween(180))+slideInVertically(tween(220)){it/3} togetherWith fadeOut(tween(120))+slideOutVertically(tween(180)){-it/3}},label="report-date") {Text(it,maxLines=1)} }
         IconButton(onClick = onNext, enabled = !current && date < LocalDate.now()) { Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, if(weekly) "下一周" else "后一天") }
         if (!current) TextButton(onClick = onToday) { Text(if(weekly) "本周" else "今天") }
     }
@@ -287,8 +339,10 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
 @Composable internal fun AppIcon(pkg: String) {
     val context = LocalContext.current
     val bitmap by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null,pkg) { value=withContext(Dispatchers.IO) { runCatching { context.packageManager.getApplicationIcon(pkg).toBitmap(80,80).asImageBitmap() }.getOrNull() } }
-    if(bitmap != null) Image(bitmap!!,null,Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)))
-    else Box(Modifier.size(36.dp).background(MaterialTheme.colorScheme.secondaryContainer,RoundedCornerShape(8.dp)),contentAlignment=Alignment.Center) { Icon(Icons.Outlined.Apps,null,Modifier.size(22.dp)) }
+    Crossfade(bitmap,animationSpec=tween(180),modifier=Modifier.size(36.dp),label="app-icon") {icon ->
+        if(icon!=null) Image(icon,null,Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)))
+        else Box(Modifier.size(36.dp).background(MaterialTheme.colorScheme.secondaryContainer,RoundedCornerShape(8.dp)),contentAlignment=Alignment.Center) {Icon(Icons.Outlined.Apps,null,Modifier.size(22.dp))}
+    }
 }
 @Composable internal fun SessionLine(s: SessionRow, records: Records, from: Long, to: Long, onClick: () -> Unit) {
     val purpose = records.annotations.firstOrNull { it.purpose.isNotBlank() && it.start <= maxOf(s.start,from) && it.end >= minOf(s.end,to) }?.purpose .orEmpty()

@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -61,6 +64,7 @@ private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) =
     val now=System.currentTimeMillis()
     val intervals=reportIntervals(records,pkg)
     val values=(0..6).map { i -> val to=minOf(bounds[i+1],now); if(bounds[i]>=now || !hasEvidence(records,bounds[i],to,pkg)) null else clippedDuration(intervals,bounds[i],to) }
+    val reveal by chartReveal(listOf(monday,pkg,values))
     val maxValue=maxOf(3_600_000L,values.filterNotNull().maxOrNull() ?: 0)
     val primary=MaterialTheme.colorScheme.primary; val grid=MaterialTheme.colorScheme.outlineVariant
     Column(Modifier.padding(horizontal=20.dp)) {
@@ -68,8 +72,10 @@ private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) =
         Canvas(Modifier.fillMaxWidth().height(128.dp).padding(horizontal=8.dp,vertical=10.dp).semantics { contentDescription=dates.zip(values).joinToString("；") { (d,v)->"$d：${if(dayStart(d)>now) "尚未开始" else v?.let { duration(it) } ?: "记录不足"}" } }.pointerInput(monday,values) { detectTapGestures { p -> val i=(p.x/size.width*6).roundToInt().coerceIn(0,6); if(bounds[i]<now) onDay(dates[i]) } }) {
             listOf(0f,.5f,1f).forEach { drawLine(grid,Offset(0f,it*size.height),Offset(size.width,it*size.height),1.dp.toPx()) }
             val points=values.mapIndexed { i,v->v?.let { Offset(i*size.width/6,size.height-it.toFloat()/maxValue*size.height) } }
-            points.zipWithNext().forEach { (a,b)->if(a!=null && b!=null) drawLine(primary,a,b,2.dp.toPx()) }
-            points.forEach { if(it!=null) drawCircle(primary,4.dp.toPx(),it) }
+            clipRect(left=-5.dp.toPx(),top=-5.dp.toPx(),right=size.width*reveal+5.dp.toPx(),bottom=size.height+5.dp.toPx()) {
+                points.zipWithNext().forEach { (a,b)->if(a!=null && b!=null) drawLine(primary,a,b,2.dp.toPx()) }
+                points.forEach { if(it!=null) drawCircle(primary,4.dp.toPx(),it) }
+            }
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
             dates.forEachIndexed { i,d->Column(Modifier.weight(1f).clickable(enabled=bounds[i]<now) { onDay(d) }.padding(vertical=8.dp),horizontalAlignment=Alignment.CenterHorizontally) {
@@ -85,6 +91,7 @@ private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) =
     val zone=ZoneId.systemDefault(); val now=System.currentTimeMillis()
     val primary=MaterialTheme.colorScheme.primary; val empty=MaterialTheme.colorScheme.surfaceVariant
     val intervals=reportIntervals(records,pkg)
+    val reveal by chartReveal(listOf(monday,pkg,intervals))
     Column(Modifier.padding(horizontal=12.dp)) {
         Text("分钟 · 每格4小时${if(pkg!=null) " · 含推算" else ""}",Modifier.padding(start=8.dp,bottom=8.dp),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         Row(Modifier.fillMaxWidth()) { Spacer(Modifier.width(40.dp)); (0..5).forEach { i -> Box(Modifier.weight(1f).padding(vertical=6.dp),contentAlignment=Alignment.Center) { Text("%02d".format(i*4),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant) } } }
@@ -102,7 +109,7 @@ private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) =
                     val ratio=if(end>from) (amount.toFloat()/(end-from)).coerceIn(0f,1f) else 0f
                     val text=when { future -> ""; !evidence -> "—"; amount in 1..59_999 -> "<1"; else -> (amount/60_000).toString() }
                     val bg=if(future) Color.Transparent else if(!evidence || amount==0L) empty else primary.copy(alpha=.18f+.82f*ratio)
-                    Box(Modifier.weight(1f).height(48.dp).padding(1.dp).background(bg,MaterialTheme.shapes.extraSmall).semantics { contentDescription="$date ${column*4}至${(column+1)*4}时：${when { future->"尚未开始"; !evidence->"记录不足"; else->duration(amount) }}" }.clickable(enabled=!future) { onSelect(from,end) },contentAlignment=Alignment.Center) {
+                    Box(Modifier.weight(1f).height(48.dp).padding(1.dp).background(if(future) bg else lerp(empty,bg,reveal),MaterialTheme.shapes.extraSmall).semantics { contentDescription="$date ${column*4}至${(column+1)*4}时：${when { future->"尚未开始"; !evidence->"记录不足"; else->duration(amount) }}" }.clickable(enabled=!future) { onSelect(from,end) },contentAlignment=Alignment.Center) {
                         Text(text,style=MaterialTheme.typography.labelSmall,color=if(ratio>.6f) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface)
                     }
                 }

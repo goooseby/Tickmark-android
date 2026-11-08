@@ -27,7 +27,16 @@ android {
             }
         }
     }
-    buildTypes { release { if (!System.getenv("TICKMARK_KEYSTORE_PATH").isNullOrBlank()) signingConfig = signingConfigs.getByName("release") } }
+    buildTypes {
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (!System.getenv("TICKMARK_KEYSTORE_PATH").isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21

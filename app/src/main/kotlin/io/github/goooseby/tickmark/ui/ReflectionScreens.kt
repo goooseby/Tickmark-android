@@ -54,21 +54,29 @@ import java.time.LocalDate
         CategoryEngine.totals(visibleSessions(records).map {Session(it.pkg,it.start,it.end,it.inferred,it.ongoing)},records.apps.associate{it.pkg to it.appCategory},from,to)
     }
     if(totals.isEmpty()) {EmptyReport("暂无可分类的手机用时");return}
+    val reveal by chartReveal(listOf(from,totals))
     Column(Modifier.padding(horizontal=20.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
         totals.forEach { (category,amount)->
             Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(category.title,style=MaterialTheme.typography.bodyMedium);Text(duration(amount),style=MaterialTheme.typography.bodyMedium)}
-            LinearProgressIndicator(progress={amount.toFloat()/totals.sumOf{it.second}},modifier=Modifier.fillMaxWidth().height(6.dp),color=reportColor(category.name),drawStopIndicator={})
+            LinearProgressIndicator(progress={amount.toFloat()/totals.sumOf{it.second}*reveal},modifier=Modifier.fillMaxWidth().height(6.dp),color=reportColor(category.name),drawStopIndicator={})
         }
         StatisticsInfoButton("应用分类统计说明","按应用所属类别汇总前台用时，包含应用图表中的推算片段；时段标注不改变应用类别。分屏应用分别计时，合计可能超过手机使用时长。隐藏和隐私排除的应用不参与，无法识别的应用保留未分类。")
     }
 }
-@Composable internal fun DataSettings(bytes:Long,lastBackup:String?,onBackup:()->Unit,onExport:()->Unit,onRestore:()->Unit,onClear:()->Unit) {
+@Composable internal fun DataSettings(bytes:Long,lastBackup:String?,onBackup:()->Unit,onExport:()->Unit,onRestore:()->Unit,onClear:()->Unit,onSaveBackup:()->Unit=onBackup,onSaveExport:()->Unit=onExport,busy:Boolean=false) {
+    var saveOptions by remember{mutableStateOf(false)}
     LazyColumn(contentPadding=PaddingValues(bottom=20.dp)) {
         item {ListItem(headlineContent={Text("本地数据")},supportingContent={Text("${"%.2f".format(bytes/1_048_576.0)} MB · 历史记录保存在此设备")})}
-        item {SettingsLink("保存 JSON 备份",lastBackup ?: "保存使用记录、草稿、复盘和设置",Icons.Outlined.Save,onBackup)}
-        item {SettingsLink("导出 CSV 会话表","用于自己的表格分析",Icons.Outlined.TableChart,onExport)}
+        if(busy) item {LinearProgressIndicator(Modifier.fillMaxWidth().padding(horizontal=20.dp))}
+        item {SettingsLink("分享 JSON 备份",lastBackup ?: "使用记录、草稿、复盘和设置",Icons.Outlined.Share,onBackup)}
+        item {SettingsLink("分享 CSV 会话表","发送给其他应用，或用于表格分析",Icons.Outlined.TableChart,onExport)}
+        item {SettingsLink("保存到文件","选择保存 JSON 备份或 CSV 会话表",Icons.Outlined.Save){saveOptions=true}}
         item {SettingsLink("从备份恢复","先预览，再替换当前数据",Icons.Outlined.Restore,onRestore)}
         item {SettingsLink("清空数据","选择重新采集或暂停",Icons.Outlined.DeleteOutline,onClear)}
         item {Text("备份含应用使用记录与个人备注，请妥善保管。",Modifier.padding(20.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
+    if(saveOptions) AlertDialog(onDismissRequest={saveOptions=false},title={Text("保存到文件")},text={Column {
+        TextButton(onClick={saveOptions=false;onSaveBackup()}){Text("保存 JSON 备份")}
+        TextButton(onClick={saveOptions=false;onSaveExport()}){Text("保存 CSV 会话表")}
+    }},confirmButton={TextButton(onClick={saveOptions=false}){Text("取消")}})
 }

@@ -15,6 +15,12 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -55,6 +61,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
     val inferred=records.sessions.filter { it.inferred && (pkg==null || it.pkg==pkg) }.map { it.start to it.end }
     val known=ReportEngine.buckets(observed,boundaries)
     val estimated=ReportEngine.buckets(inferred,boundaries)
+    val reveal by chartReveal(listOf(date,pkg,known.map{it.duration},estimated.map{it.duration}))
     val primary=MaterialTheme.colorScheme.primary
     val estimateColor=MaterialTheme.colorScheme.tertiary.copy(alpha=.55f)
     val grid=MaterialTheme.colorScheme.outlineVariant
@@ -71,8 +78,8 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
                 known.forEachIndexed { i,b ->
                     val x=i*step+step*.16f
                     if(Instant.ofEpochMilli(b.start).atZone(ZoneId.systemDefault()).hour==selectedHour) drawRect(background,Offset(i*step,0f),Size(step,size.height))
-                    val height=(b.duration/3_600_000f).coerceIn(0f,1f)*size.height
-                    val extra=(estimated[i].duration/3_600_000f).coerceIn(0f,1f)*size.height
+                    val height=(b.duration/3_600_000f).coerceIn(0f,1f)*size.height*reveal
+                    val extra=(estimated[i].duration/3_600_000f).coerceIn(0f,1f)*size.height*reveal
                     if(b.start<now) {
                         if(height>0) drawRoundRect(primary,Offset(x,size.height-height),Size(step*.68f,height),androidx.compose.ui.geometry.CornerRadius(2.dp.toPx()))
                         if(extra>0) drawRect(estimateColor,Offset(x,(size.height-height-extra).coerceAtLeast(0f)),Size(step*.68f,extra.coerceAtMost(size.height-height)))
@@ -97,6 +104,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
     val total=shown.sumOf { it.second }
     if(total==0L) { EmptyReport("这段时间暂无应用记录"); return }
     val description=shown.joinToString("；") { "${if(it.first=="@other") "其他应用" else appName(it.first,records)} ${duration(it.second)}，${(it.second.toDouble()/total*100).roundToInt()}%" }
+    val reveal by chartReveal(listOf(from,shown.map{it.first to it.second}))
     val track=MaterialTheme.colorScheme.surfaceVariant
     val sliceNames=shown.map { if(it.first=="@other") "其他应用" else appName(it.first,records) }
     var allApps by remember(from,to) { mutableStateOf(false) }
@@ -115,7 +123,12 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
                 val stroke=24.dp.toPx(); val inset=stroke/2
                 drawArc(track,0f,360f,false,Offset(inset,inset),Size(size.width-stroke,size.height-stroke),style=Stroke(stroke))
                 var angle=-90f
-                shown.forEach { (_,amount,color) -> val sweep=amount.toFloat()/total*360; drawArc(color,angle+.8f,(sweep-1.6f).coerceAtLeast(.1f),false,Offset(inset,inset),Size(size.width-stroke,size.height-stroke),style=Stroke(stroke)); angle+=sweep }
+                shown.forEach { (_,amount,color) ->
+                    val sweep=amount.toFloat()/total*360
+                    val visible=(360f*reveal-(angle+90f)).coerceIn(0f,sweep)
+                    if(visible>0f) drawArc(color,angle+.8f,(visible-1.6f).coerceAtLeast(.1f),false,Offset(inset,inset),Size(size.width-stroke,size.height-stroke),style=Stroke(stroke))
+                    angle+=sweep
+                }
             }
             Column(Modifier.width(112.dp),horizontalAlignment=Alignment.CenterHorizontally) { Text("应用前台",style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant); Text(duration(total),style=MaterialTheme.typography.titleMedium,textAlign=androidx.compose.ui.text.style.TextAlign.Center,maxLines=2) }
         }
@@ -129,12 +142,14 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
         }
         if(ranking.size>4) {
             TextButton(onClick={ allApps=!allApps },modifier=Modifier.padding(horizontal=12.dp)) { Text(if(allApps) "收起应用" else "全部 ${ranking.size} 个应用") }
-            if(allApps) ranking.drop(4).forEach { (pkg,amount) ->
+            AnimatedVisibility(allApps,enter=expandVertically()+fadeIn(),exit=shrinkVertically()+fadeOut()) { Column {
+            ranking.drop(4).forEach { (pkg,amount) ->
                 Row(Modifier.fillMaxWidth().clickable { onApp(pkg) }.padding(horizontal=20.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                     Text(appName(pkg,records),Modifier.weight(1f),maxLines=1,overflow=TextOverflow.Ellipsis)
                     Text(duration(amount),style=MaterialTheme.typography.bodyMedium)
                 }
             }
+            } }
         }
     }
 }
@@ -147,6 +162,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
         val hasEvidence=records.deviceSpans.any { it.state!=io.github.goooseby.tickmark.engine.model.DeviceState.UNKNOWN && it.start<to && it.end>from } || (pkg!=null && records.sessions.any { it.pkg==pkg && it.start<to && it.end>from })
         if(!hasEvidence) null else unionDuration(intervals.map { maxOf(it.first,from) to minOf(it.second,to) })
     }
+    val reveal by chartReveal(listOf(date,pkg,values))
     val maxValue=maxOf(3_600_000L,values.filterNotNull().maxOrNull() ?: 0)
     val primary=MaterialTheme.colorScheme.primary; val grid=MaterialTheme.colorScheme.outlineVariant
     Column(Modifier.padding(horizontal=20.dp)) {
@@ -154,8 +170,10 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
         Canvas(Modifier.fillMaxWidth().height(120.dp).padding(vertical=10.dp).semantics { contentDescription=dates.zip(values).joinToString("；") { (d,v)->"$d：${v?.let { duration(it) } ?: "记录不足"}" } }.pointerInput(dates) { detectTapGestures { p -> onDate(dates[(p.x/size.width*6).roundToInt().coerceIn(0,6)]) } }) {
             listOf(0f,.5f,1f).forEach { drawLine(grid,Offset(0f,size.height*it),Offset(size.width,size.height*it),1.dp.toPx()) }
             val points=values.mapIndexed { i,v -> v?.let { Offset(i*size.width/6,size.height-it.toFloat()/maxValue*size.height) } }
-            points.zipWithNext().forEach { (a,b) -> if(a!=null && b!=null) drawLine(primary,a,b,2.dp.toPx()) }
-            points.forEach { if(it!=null) drawCircle(primary,4.dp.toPx(),it) }
+            clipRect(left=-5.dp.toPx(),top=-5.dp.toPx(),right=size.width*reveal+5.dp.toPx(),bottom=size.height+5.dp.toPx()) {
+                points.zipWithNext().forEach { (a,b) -> if(a!=null && b!=null) drawLine(primary,a,b,2.dp.toPx()) }
+                points.forEach { if(it!=null) drawCircle(primary,4.dp.toPx(),it) }
+            }
         }
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) { dates.forEach { d -> Text(d.format(DateTimeFormatter.ofPattern("M/d")),Modifier.clickable { onDate(d) }.padding(vertical=8.dp),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant) } }
         if(values.any { it==null }) Text("断点表示记录不足",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -166,6 +184,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
 @Composable internal fun AppDistribution(records:Records,from:Long,to:Long,onApp:(String)->Unit) {
     if(to<=from) { EmptyReport("此时段尚未开始"); return }
     val ranking=composition(visibleSessions(records),from,to).take(5)
+    val reveal by chartReveal(listOf(from,ranking))
     val steps=if(to-from<=3_600_000) 12 else 24
     val boundaries=(0..steps).map { from+(to-from)*it/steps }
     Column(Modifier.padding(horizontal=20.dp)) {
@@ -175,7 +194,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
             Column(Modifier.fillMaxWidth().clickable { onApp(pkg) }.padding(vertical=10.dp)) {
                 Text(appName(pkg,records),style=MaterialTheme.typography.labelMedium,maxLines=1,overflow=TextOverflow.Ellipsis)
                 Row(Modifier.fillMaxWidth().padding(top=6.dp),horizontalArrangement=Arrangement.spacedBy(2.dp)) {
-                    values.forEach { b -> val ratio=(b.duration.toFloat()/(b.end-b.start)).coerceIn(0f,1f); Box(Modifier.weight(1f).height(18.dp).background(if(ratio>0) palette[index].copy(alpha=.18f+.82f*ratio) else MaterialTheme.colorScheme.surfaceVariant)) }
+                    values.forEach { b -> val ratio=(b.duration.toFloat()/(b.end-b.start)).coerceIn(0f,1f); Box(Modifier.weight(1f).height(18.dp).background(if(ratio>0) palette[index].copy(alpha=(.18f+.82f*ratio)*reveal) else MaterialTheme.colorScheme.surfaceVariant)) }
                 }
             }
         }
