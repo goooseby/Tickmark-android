@@ -92,3 +92,15 @@
 验证数据仅在内存测试库或独立临时验证设备，未向原调试设备正式数据库注入样例。临时日志、截图及验证设备在任务结束清理，恢复原设备尺寸、字号、夜间及动画设置；正式测试APK和对应符号保留在构建输出。
 
 折线裁切留白与极小环图扇区修正后，4项相关绘制和页面测试再次通过，截图确认边界圆点完整。[本轮云端Debug、优化Release、算法与静态检查](https://github.com/goooseby/Tickmark-android/actions/runs/42485313906)通过。
+
+
+## 0.5.0正式发布（2026-11-08）
+
+用户授权正常顺延至0.5.0 / 5，发布页面、日期和图表动效，固定尺寸日报/周报图片分享，以及JSON/CSV直接分享。用户说明见[0.5.0](../releases/0.5.0.md)。
+
+- [Verify Android](https://github.com/goooseby/Tickmark-android/actions/runs/42486378183)与[正式签名构建](https://github.com/goooseby/Tickmark-android/actions/runs/42486379391)均成功，包含Debug/Release构建、静态检查与engine测试。前述45项设备测试及深色、大字体、关闭动画验证适用于同一功能实现；本次版本变更后未重复全量设备测试。
+- 下载云端最终APK，核对包名io.github.goooseby.tickmark、版本0.5.0 / 5、正式签名与旧版一致，APK v2验证通过。体积4,443,091字节，SHA-256为21bd0f0e374784d5cde57da6bbf645d43ebe1ef2c8d16b82655910e818d8eb41，与SHA256SUMS和GitHub资产digest一致；update.json匹配，R8映射压缩包包含该APK校验值。
+- 独立API36设备从正式签名0.4.0覆盖安装云端0.5.0成功。重新打开原随手记，正文Saved_before_R8保留；日报分享实际打开系统图片Sharesheet，两个已固定桌面组件保持正常且刷新成功。本次未做QQ实际发送或真机测试，也未将ADB安装视为完整应用内下载与系统授权安装验证。
+- 已公开[v0.5.0](https://github.com/goooseby/Tickmark-android/releases/tag/v0.5.0)并设为最新；latest接口返回该版本，公开更新清单与校验文件无需认证可读。0.4.0发布资产未替换。
+
+临时验证设备及本轮日志、截图、下载文件已移除，保留原模拟器与其他图标设计输出；原模拟器的尺寸、字号、夜间及动画设置已恢复。
