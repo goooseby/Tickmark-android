@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.goooseby.tickmark"
         minSdk = 29
         targetSdk = 36
-        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("5").get().toInt()
-        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.5.0").get()
+        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("6").get().toInt()
+        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.5.1").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }

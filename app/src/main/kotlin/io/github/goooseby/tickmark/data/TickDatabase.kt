@@ -22,6 +22,10 @@ data class CoverageRow(@PrimaryKey val start: Long, val end: Long, val eventCoun
 
 @Dao
 interface TickDao {
+    @Query("SELECT * FROM system_summaries ORDER BY start") suspend fun allSummaries():List<SystemUsageSummary>
+    @Insert(onConflict=OnConflictStrategy.REPLACE) suspend fun putSummaries(rows:List<SystemUsageSummary>)
+    @Query("DELETE FROM system_summaries") suspend fun deleteSummaries()
+    @Query("DELETE FROM system_summaries WHERE pkg=:pkg") suspend fun deleteAppSummaries(pkg:String)
     @Query("SELECT * FROM events ORDER BY time, sequence") suspend fun events(): List<EventRow>
     @Query("SELECT * FROM sessions ORDER BY start") fun sessions(): Flow<List<SessionRow>>
     @Query("SELECT * FROM spans ORDER BY start") fun spans(): Flow<List<SpanRow>>
@@ -77,5 +81,11 @@ val MIGRATION_2_3=object:androidx.room.migration.Migration(2,3) {
         config.keys.filter{Regex("^review:\\d{4}-\\d{2}-\\d{2}:(good|change|next)$").matches(it)}.forEach {db.execSQL("DELETE FROM config WHERE `key`=?",arrayOf(it))}
     }
 }
-@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class,JournalRow::class], version = 3, exportSchema = false)
+val MIGRATION_3_4=object:androidx.room.migration.Migration(3,4) {
+    override fun migrate(db:androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL(SUMMARY_TABLE_SQL)
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_system_summaries_start ON system_summaries(start)")
+    }
+}
+@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class,JournalRow::class,SystemUsageSummary::class], version = 4, exportSchema = false)
 abstract class TickDatabase : RoomDatabase() { abstract fun dao(): TickDao }

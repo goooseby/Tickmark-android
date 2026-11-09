@@ -45,6 +45,11 @@ class ShareUiTest {
     }
     private fun uri(intent:Intent)=IntentCompat.getParcelableExtra(intent,Intent.EXTRA_STREAM,Uri::class.java)!!
 
+    private fun scroll(text:String):SemanticsNodeInteraction {
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(text))
+        return compose.onNodeWithText(text)
+    }
+
     @Test fun overviewSharesAFixedReportWithALinkWithoutOpeningAFilePicker() {
         compose.setContent{Tickmark(repo)}
         compose.onNodeWithContentDescription("分享每日概览").performClick()
@@ -57,16 +62,15 @@ class ShareUiTest {
     @Test fun backupAndCsvShareDirectlyAndSavingToAFileRemainsAvailable() {
         compose.setContent{Tickmark(repo)}
         compose.onNodeWithText("设置").performClick();compose.onNodeWithText("数据管理").performClick()
-        compose.onNodeWithText("分享 JSON 备份").performClick()
+        scroll("创建完整备份").performClick()
+        compose.onNodeWithText("分享备份").performClick()
         val backup=shared();assertEquals("application/json",backup.type)
         val json=instrumentation.targetContext.contentResolver.openInputStream(uri(backup))!!.bufferedReader().use{JSONObject(it.readText())}
-        assertEquals(2,json.getInt("schemaVersion"));assertTrue(json.has("journal"))
-        compose.onNodeWithText("分享 CSV 会话表").performClick()
-        val csv=shared();assertEquals("text/csv",csv.type)
-        val text=instrumentation.targetContext.contentResolver.openInputStream(uri(csv))!!.bufferedReader().use{it.readText()}
-        assertTrue(text.contains("package,name,start_ms"))
-        compose.onNodeWithText("保存到文件").performClick()
-        compose.onNodeWithText("保存 JSON 备份").assertIsDisplayed();compose.onNodeWithText("保存 CSV 会话表").assertIsDisplayed()
+        assertEquals(3,json.getInt("schemaVersion"));assertTrue(json.has("journal"))
+        scroll("创建完整备份").performClick()
+        compose.onNodeWithText("保存备份").assertIsDisplayed()
+        compose.onNodeWithText("分享备份").assertIsDisplayed()
+
     }
 
     @Test fun interruptedTabTransitionsKeepOneLiveDestinationAndBackReturnsToToday() {

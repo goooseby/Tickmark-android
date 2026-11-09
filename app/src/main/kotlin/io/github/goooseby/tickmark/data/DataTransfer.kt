@@ -11,7 +11,7 @@ class DataTransfer(private val repo: TickRepository) {
     private fun <T> array(rows: List<T>, block: (T) -> JSONObject) = JSONArray().apply { rows.forEach { put(block(it)) } }
     suspend fun backup(): String = repo.exclusive {
         val d = repo.dao
-        obj("schemaVersion" to 2, "algorithmVersion" to 2, "zoneId" to ZoneId.systemDefault().id,
+        obj("schemaVersion" to 3, "algorithmVersion" to 2, "zoneId" to ZoneId.systemDefault().id,
             "createdAt" to System.currentTimeMillis(),
             "events" to array(d.events()) { obj("id" to it.id, "time" to it.time, "kind" to it.kind, "pkg" to it.pkg, "activity" to it.activity, "instance" to it.instance, "sequence" to it.sequence) },
             "sessions" to array(d.allSessions()) { obj("id" to it.id, "pkg" to it.pkg, "start" to it.start, "end" to it.end, "inferred" to it.inferred, "ongoing" to it.ongoing) },
@@ -21,13 +21,15 @@ class DataTransfer(private val repo: TickRepository) {
                 "automaticCategory" to it.automaticCategory,"categoryOverride" to (it.categoryOverride ?: JSONObject.NULL)) },
             "coverage" to array(d.allCoverage()) { obj("start" to it.start, "end" to it.end, "eventCount" to it.eventCount) },
             "config" to array(d.allConfig()) { obj("key" to it.key, "value" to it.value) },
-            "journal" to array(d.allJournal(),JournalCodec::encode)).toString(2)
+            "journal" to array(d.allJournal(),JournalCodec::encode),
+            "systemSummaries" to array(d.allSummaries(),SummaryCodec::encode)).toString(2)
     }
-    data class Restore(val events: List<EventRow>, val sessions: List<SessionRow>, val spans: List<SpanRow>, val annotations: List<AnnotationRow>, val apps: List<AppRow>, val coverage: List<CoverageRow>, val config: List<ConfigRow>, val zone: String,val journal:List<JournalRow> = emptyList())
+    data class Restore(val events: List<EventRow>, val sessions: List<SessionRow>, val spans: List<SpanRow>, val annotations: List<AnnotationRow>, val apps: List<AppRow>, val coverage: List<CoverageRow>, val config: List<ConfigRow>, val zone: String,val journal:List<JournalRow> = emptyList(),val summaries:List<SystemUsageSummary> = emptyList())
     fun parse(text: String): Restore {
         val root = JSONObject(text)
+        require(root.optString("type")!="tickmark.usage-report"){"这是分析报告，请选择完整 JSON 备份进行恢复"}
         val schema=root.getInt("schemaVersion")
-        require(schema in 1..2 && root.getInt("algorithmVersion") in 1..2) { "不支持此备份版本" }
+        require(schema in 1..3 && root.getInt("algorithmVersion") in 1..2) { "不支持此备份版本" }
         fun <T> read(key: String, block: (JSONObject) -> T): List<T> {
             val a = root.getJSONArray(key)
             require(a.length() <= 1_000_000) { "备份记录过多" }
@@ -44,7 +46,8 @@ class DataTransfer(private val repo: TickRepository) {
                 it.optString("automaticCategory",""),if(it.has("categoryOverride") && !it.isNull("categoryOverride")) it.getString("categoryOverride") else null) },
             read("coverage") { CoverageRow(it.getLong("start"), it.getLong("end"), it.getInt("eventCount")) },
             read("config") { ConfigRow(it.getString("key"), it.getString("value")) }, root.getString("zoneId"),
-            if(schema>=2) read("journal",JournalCodec::decode) else JournalRow.legacy(read("config"){ConfigRow(it.getString("key"),it.getString("value"))}.associate{it.key to it.value}))
+            if(schema>=2) read("journal",JournalCodec::decode) else JournalRow.legacy(read("config"){ConfigRow(it.getString("key"),it.getString("value"))}.associate{it.key to it.value}),
+            if(schema>=3) read("systemSummaries",SummaryCodec::decode) else emptyList())
         ZoneId.of(result.zone)
         result.sessions.forEach { valid(it.start, it.end) }
         result.spans.forEach { valid(it.start, it.end) }
@@ -61,7 +64,8 @@ class DataTransfer(private val repo: TickRepository) {
         val config = result.config.associate { it.key to it.value }
         require(result.journal.distinctBy{it.id}.size==result.journal.size){"备份包含重复记录"}
         result.journal.forEach(JournalRow::validate)
-        listOf("lastSync", "captureStart").forEach { key -> config[key]?.let { require(it.toLongOrNull()?.let { v -> v >= 0 } == true) { "备份采集配置无效" } } }
+        listOf("lastSync", "captureStart", "captureFloor").forEach { key -> config[key]?.let { require(it.toLongOrNull()?.let { v -> v >= 0 } == true) { "备份采集配置无效" } } }
+        require(result.summaries.distinctBy{it.id}.size==result.summaries.size){"备份包含重复系统汇总"}
         return result
     }
     suspend fun restore(data: Restore) = repo.exclusive {
@@ -70,6 +74,7 @@ class DataTransfer(private val repo: TickRepository) {
             repo.dao.putEvents(data.events); repo.dao.putSessions(data.sessions); repo.dao.putSpans(data.spans)
             repo.dao.putAnnotations(data.annotations); repo.dao.putApps(data.apps); repo.dao.putCoverage(data.coverage)
             repo.dao.putJournal(data.journal)
+            repo.dao.putSummaries(data.summaries.filter{summary->data.apps.none{it.pkg==summary.pkg && it.excluded}})
             // Imported history is kept until the user explicitly resumes capture.
             repo.dao.putConfig(data.config.filter { it.key != "paused" && !it.key.startsWith("observedBoot:") && !Regex("^review:\\d{4}-\\d{2}-\\d{2}:(good|change|next)$").matches(it.key) } + ConfigRow("paused", "true"))
         }

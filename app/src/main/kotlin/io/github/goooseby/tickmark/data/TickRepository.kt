@@ -24,6 +24,8 @@ import io.github.goooseby.tickmark.data.report.Records
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import kotlinx.coroutines.ensureActive
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -36,13 +38,13 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
     val syncing = MutableStateFlow(false)
     val message = MutableStateFlow<String?>(null)
     val records: Flow<Records> = db.invalidationTracker.createFlow(
-        "sessions","spans","annotations","metadata","coverage","config","events","journal",emitInitialState=true
+        "sessions","spans","annotations","metadata","coverage","config","events","journal","system_summaries",emitInitialState=true
     ).map { snapshot() }.distinctUntilChanged().flowOn(Dispatchers.IO)
 
     suspend fun snapshot(): Records = withContext(Dispatchers.IO) {
         db.withTransaction {
             Records(dao.allSessions(),dao.allSpans(),dao.allAnnotations(),dao.allApps(),dao.allCoverage(),
-                dao.allConfig().associate { it.key to it.value },dao.allUnlocks(),dao.allJournal())
+                dao.allConfig().associate { it.key to it.value },dao.allUnlocks(),dao.allJournal(),dao.allSummaries())
         }
     }
     fun hasAccess(): Boolean = context.getSystemService(AppOpsManager::class.java)
@@ -74,38 +76,50 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
                 check(context.getSystemService(UserManager::class.java).isUserUnlocked) { "解锁设备后再刷新" }
                 val config = dao.allConfig().associate { it.key to it.value }
                 if (config["paused"] == "true") return@withLock
-                val now = System.currentTimeMillis()
-                val first = config["captureStart"]?.toLongOrNull()
-                    ?: LocalDate.now().minusDays(7).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                val from = maxOf(first, (config["lastSync"]?.toLongOrNull() ?: first) - 30 * 60_000L)
-                val manager = context.getSystemService(UsageStatsManager::class.java)
-                val source = manager.queryEvents(from, now) ?: error("系统暂时无法提供记录，请解锁后重试")
-                val rules = dao.allApps().associateBy { it.pkg }
-                val rows = mutableListOf<EventRow>()
-                val event = UsageEvents.Event()
-                var sequence = 0
-                while (source.hasNextEvent()) {
-                    source.getNextEvent(event)
-                    val kind = when (event.eventType) {
-                        UsageEvents.Event.ACTIVITY_RESUMED -> EventKind.RESUME
-                        UsageEvents.Event.ACTIVITY_PAUSED -> EventKind.PAUSE
-                        UsageEvents.Event.ACTIVITY_STOPPED -> EventKind.STOP
-                        UsageEvents.Event.SCREEN_INTERACTIVE -> EventKind.SCREEN_ON
-                        UsageEvents.Event.SCREEN_NON_INTERACTIVE -> EventKind.SCREEN_OFF
-                        UsageEvents.Event.KEYGUARD_HIDDEN -> EventKind.UNLOCK
-                        UsageEvents.Event.KEYGUARD_SHOWN -> EventKind.LOCK
-                        UsageEvents.Event.DEVICE_STARTUP -> EventKind.STARTUP
-                        UsageEvents.Event.DEVICE_SHUTDOWN -> EventKind.SHUTDOWN
-                        else -> null
-                    } ?: continue
-                    if (event.timeStamp !in from until now) continue
-                    val excluded = rules[event.packageName]?.excluded == true
-                    val pkg = if (excluded) "@excluded" else event.packageName.orEmpty()
-                    // Identity is removed before persistence; anonymous lifecycle boundaries remain.
-                    val cls = if (excluded) "" else event.className.orEmpty()
-                    // The public SDK does not expose Activity instance IDs; match package + class.
-                    rows += EventRow("${event.timeStamp}:${sequence}", event.timeStamp, kind.name, pkg, cls, 0, sequence++)
+                val existingStart=config["captureStart"]?.toLongOrNull()
+                // Earlier versions recorded an exact clear time, while the default was local midnight.
+                val legacyFloor=existingStart?.takeIf {
+                    config["historyImported"]==null && Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalTime()!=java.time.LocalTime.MIDNIGHT
                 }
+                val floor=config["captureFloor"]?.toLongOrNull() ?: legacyFloor ?: 0L
+                val importHistory=config["historyImported"]!="true"
+                val now = System.currentTimeMillis()
+                val from=if(importHistory) floor else maxOf(floor,(config["lastSync"]?.toLongOrNull() ?: now)-30*60_000L)
+                val windows=if(importHistory) HistoryImport.windows(now,floor) else listOf(from to now)
+                val manager=context.getSystemService(UsageStatsManager::class.java)
+                val rules=dao.allApps().associateBy{it.pkg}
+                val rows=mutableListOf<EventRow>()
+                var sequence=0
+                for((start,end) in windows) {
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    val source=manager.queryEvents(start,end) ?: error("系统暂时无法提供记录，请解锁后重试")
+                    val event=UsageEvents.Event()
+                    while(source.hasNextEvent()) {
+                        source.getNextEvent(event)
+                        val kind=when(event.eventType) {
+                            UsageEvents.Event.ACTIVITY_RESUMED->EventKind.RESUME
+                            UsageEvents.Event.ACTIVITY_PAUSED->EventKind.PAUSE
+                            UsageEvents.Event.ACTIVITY_STOPPED->EventKind.STOP
+                            UsageEvents.Event.SCREEN_INTERACTIVE->EventKind.SCREEN_ON
+                            UsageEvents.Event.SCREEN_NON_INTERACTIVE->EventKind.SCREEN_OFF
+                            UsageEvents.Event.KEYGUARD_HIDDEN->EventKind.UNLOCK
+                            UsageEvents.Event.KEYGUARD_SHOWN->EventKind.LOCK
+                            UsageEvents.Event.DEVICE_STARTUP->EventKind.STARTUP
+                            UsageEvents.Event.DEVICE_SHUTDOWN->EventKind.SHUTDOWN
+                            else->null
+                        } ?: continue
+                        if(event.timeStamp !in start until end) continue
+                        val excluded=rules[event.packageName]?.excluded==true
+                        val pkg=if(excluded) "@excluded" else event.packageName.orEmpty()
+                        val cls=if(excluded) "" else event.className.orEmpty()
+                        rows+=EventRow("${event.timeStamp}:${sequence}",event.timeStamp,kind.name,pkg,cls,0,sequence++)
+                    }
+                    kotlinx.coroutines.yield()
+                }
+                // A one-time broader import must not erase locally preserved older events.
+                val saved=if(importHistory) dao.events() else emptyList()
+                val imported=if(importHistory) HistoryImport.additions(saved,rows) else rows
+                val first=if(floor>0) floor else minOf(existingStart ?: now,rows.minOfOrNull{it.time} ?: (now-1).coerceAtLeast(0))
                 val metadata=appMetadata(rows.map{it.pkg}.filter{it !in rules},rules)
                 val observedAt=System.currentTimeMillis()
                 val interactive=context.getSystemService(PowerManager::class.java).isInteractive
@@ -116,18 +130,33 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
                 val bootCount=Settings.Global.getInt(context.contentResolver,Settings.Global.BOOT_COUNT,-1)
                 val bootKey="observedBoot:$bootCount"
                 val bootTime=config[bootKey]?.toLongOrNull() ?: (observedAt-SystemClock.elapsedRealtime()).coerceAtLeast(0)
-                if(bootCount>=0 && config[bootKey]==null) observations+=EventRow("observe:boot:$bootCount:$bootTime",bootTime,"OBSERVE_BOOT","","",0,-1)
+                if(bootCount>=0 && config[bootKey]==null && bootTime>=floor) observations+=EventRow("observe:boot:$bootCount:$bootTime",bootTime,"OBSERVE_BOOT","","",0,-1)
                 db.withTransaction {
-                    dao.deleteSystemEvents(from, now)
-                    dao.putEvents(rows)
+                    if(!importHistory) dao.deleteSystemEvents(from, now)
+                    dao.putEvents(imported)
                     dao.putEvents(observations)
                     dao.putApps(metadata)
                     rebuild(observedAt)
-                    dao.putCoverage(listOf(CoverageRow(from, now, rows.size)))
-                    dao.putConfig(listOf(ConfigRow("lastSync", now.toString()), ConfigRow("captureStart", first.toString()),ConfigRow("lastObserved",observedAt.toString()),ConfigRow("algorithmVersion","2")))
+                    dao.putCoverage(listOf(CoverageRow(if(importHistory) first else from, now, rows.size)))
+                    dao.putConfig(listOf(ConfigRow("lastSync", now.toString()), ConfigRow("captureStart", first.toString()),ConfigRow("lastObserved",observedAt.toString()),ConfigRow("algorithmVersion","2"),ConfigRow("historyImported","true"),ConfigRow("captureFloor",floor.toString())))
                     if(bootCount>=0) dao.putConfig(listOf(ConfigRow(bootKey,bootTime.toString())))
                 }
-                message.value = null
+                // Aggregates have their own provenance and may outlive event-level history.
+                try {
+                    val lastSummary=config["lastSummarySync"]?.toLongOrNull() ?: 0
+                    if(now-lastSummary>=86_400_000L || config["historySummaryImported"]!="true") {
+                        val summaries=SummaryCodec.query(manager,floor,now,rules.values.filter{it.excluded}.map{it.pkg}.toSet())
+                        val summaryApps=appMetadata(summaries.map{it.pkg}.filter{it !in rules},rules)
+                        db.withTransaction {
+                            dao.putSummaries(summaries);dao.putApps(summaryApps)
+                            dao.putConfig(listOf(ConfigRow("lastSummarySync",now.toString()),ConfigRow("historySummaryImported","true")))
+                        }
+                    }
+                    message.value=null
+                } catch(e:Exception) {
+                    if(e is kotlinx.coroutines.CancellationException) throw e
+                    message.value="使用记录已保存，系统历史汇总暂未更新，请稍后刷新。"
+                }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 message.value = "同步未完成，已保留本地记录。${e.message.orEmpty().take(100)}"
@@ -199,6 +228,7 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
                 val current=dao.allApps().find{it.pkg==app.pkg}
                 dao.putApps(listOf(app.copy(automaticCategory=current?.automaticCategory ?: app.automaticCategory)))
                 if (app.excluded) {
+                    dao.deleteAppSummaries(app.pkg)
                     val raw = dao.events()
                     dao.putEvents(raw.filter { it.pkg == app.pkg }.map { it.copy(pkg = "@excluded", activity = "", instance = 0) })
                     rebuild(System.currentTimeMillis())
@@ -209,13 +239,14 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
     suspend fun clear(paused: Boolean) = withContext(Dispatchers.IO) {
         mutex.withLock { db.withTransaction {
             wipe()
-            dao.putConfig(listOf(ConfigRow("captureStart", System.currentTimeMillis().toString()), ConfigRow("paused", paused.toString())))
+            val start=System.currentTimeMillis().toString()
+            dao.putConfig(listOf(ConfigRow("captureStart",start),ConfigRow("captureFloor",start),ConfigRow("historyImported","true"),ConfigRow("paused",paused.toString())))
         } }
     }
     suspend fun wipe() {
         dao.allJournal().forEach{journalRevisions[it.id]=(journalRevisions[it.id] ?: 0L)+1}
         dao.deleteEvents(Long.MIN_VALUE, Long.MAX_VALUE); dao.deleteSessions(); dao.deleteSpans()
-        dao.deleteAnnotations(); dao.deleteApps(); dao.deleteConfig(); dao.deleteCoverage();dao.deleteJournal()
+        dao.deleteAnnotations(); dao.deleteApps(); dao.deleteConfig(); dao.deleteCoverage();dao.deleteJournal();dao.deleteSummaries()
     }
     suspend fun <T> exclusive(block: suspend () -> T): T = withContext(Dispatchers.IO) { mutex.withLock { block() } }
 }

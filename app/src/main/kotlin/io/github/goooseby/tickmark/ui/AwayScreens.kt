@@ -12,10 +12,12 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.goooseby.tickmark.data.report.Records
@@ -27,11 +29,26 @@ import java.time.*
 internal const val AWAY_INFO="这里统计有息屏或锁屏依据的时段，不把记录缺失算作未使用。相邻的息屏与锁屏可合并为一段，遇到使用或未知状态会断开。跨日只计当天部分；进行中的时段截至最近一次采集，不持续猜测。息屏或锁屏不代表学习、睡眠或专注，用途可由你补记。"
 
 @Composable internal fun AwayOverview(report:DeviceReport,onOpen:()->Unit) {
-    ChartTitle("未使用手机","查看时段",onOpen)
-    Row(Modifier.fillMaxWidth().clickable(onClick=onOpen).padding(horizontal=20.dp,vertical=8.dp),horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-        Metric("累计",duration(report.notUsed),Modifier.weight(1f))
-        Metric("最长一段",duration(report.longestAway?.duration ?: 0),Modifier.weight(1f))
-        Icon(Icons.Outlined.ChevronRight,null,tint=MaterialTheme.colorScheme.onSurfaceVariant)
+    val scheme = MaterialTheme.colorScheme
+    ReportSurface {
+        Row(
+            Modifier.fillMaxWidth().clickable(role = Role.Button, onClickLabel = "查看时段", onClick = onOpen)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconTile(Icons.Outlined.NightsStay, scheme.tertiaryContainer, scheme.onTertiaryContainer)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text("未使用手机", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (report.notUsed == 0L && report.spans.all { it.state == DeviceState.UNKNOWN }) "暂无足够记录"
+                    else "累计 ${duration(report.notUsed)} · 最长 ${duration(report.longestAway?.duration ?: 0)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant,
+                )
+            }
+            Icon(Icons.Outlined.ChevronRight, null, tint = scheme.onSurfaceVariant)
+        }
     }
 }
 
@@ -48,13 +65,17 @@ internal const val AWAY_INFO="这里统计有息屏或锁屏依据的时段，�
                 StatisticsInfoButton("未使用时段统计说明",AWAY_INFO)
             }
         }
-        item {Row(Modifier.padding(horizontal=20.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(20.dp)) {
-            Metric("累计未使用",duration(report.notUsed),Modifier.weight(1f))
-            Metric("最长一段",duration(report.longestAway?.duration ?: 0),Modifier.weight(1f))
-        }}
+        item {
+            ReportSurface {
+                Row(Modifier.padding(14.dp),horizontalArrangement=Arrangement.spacedBy(16.dp)) {
+                    Metric("累计未使用",duration(report.notUsed),Modifier.weight(1f), prominent = true)
+                    Metric("最长一段",duration(report.longestAway?.duration ?: 0),Modifier.weight(1f))
+                }
+            }
+        }
         item {ChartTitle("全天分布")}
         item {AwayTimeline(report)}
-        item {Row(Modifier.padding(horizontal=20.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        item {FlowRow(Modifier.padding(horizontal=20.dp,vertical=12.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             FilterChip(showAll,onClick={showAll=!showAll},label={Text(if(showAll) "全部时段" else "至少5分钟")})
             FilterChip(chronological,onClick={chronological=!chronological},label={Text(if(chronological) "时间顺序" else "最长优先")})
         }}
@@ -86,7 +107,7 @@ internal const val AWAY_INFO="这里统计有息屏或锁屏依据的时段，�
     val unknown=MaterialTheme.colorScheme.surfaceContainerHighest
     val reveal by chartReveal(report)
     Column(Modifier.padding(horizontal=20.dp)) {
-        Canvas(Modifier.fillMaxWidth().height(64.dp).semantics{contentDescription="息屏${duration(report.screenOff)}，锁屏${duration(report.locked)}，记录空档${duration(report.unknown)}"}) {
+        Canvas(Modifier.fillMaxWidth().height(42.dp).clip(MaterialTheme.shapes.medium).semantics{contentDescription="息屏${duration(report.screenOff)}，锁屏${duration(report.locked)}，记录空档${duration(report.unknown)}"}) {
             val range=(report.until-report.from).coerceAtLeast(1)
             report.spans.forEach { span ->
                 val x=(span.start-report.from).toFloat()/range*size.width

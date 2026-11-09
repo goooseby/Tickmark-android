@@ -18,6 +18,7 @@ data class Records(
     val config: Map<String,String> = emptyMap(),
     val unlocks: List<Long> = emptyList(),
     val journal:List<JournalRow> = emptyList(),
+    val summaries:List<SystemUsageSummary> = emptyList(),
 ) {
     /** Normalize once per immutable database snapshot, including conflicts in restored records. */
     val deviceSpans: List<DeviceSpan> by lazy {

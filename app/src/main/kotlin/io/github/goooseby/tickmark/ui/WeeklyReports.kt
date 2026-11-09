@@ -39,9 +39,11 @@ private fun clippedDuration(intervals:List<Pair<Long,Long>>,from:Long,to:Long) =
     val recorded=bounds.zipWithNext().count { (a,b)->a<now && hasEvidence(records,a,minOf(b,now),null) }
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=24.dp)) {
         item {
-            Row(Modifier.padding(horizontal=20.dp,vertical=14.dp),horizontalArrangement=Arrangement.spacedBy(24.dp)) {
-                Metric("累计使用",duration(total),Modifier.weight(1.4f))
-                Metric("已记录日期","$recorded / $elapsed 天",Modifier.weight(1f))
+            ReportSurface {
+                Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Metric("累计使用",duration(total),Modifier.weight(1.4f), prominent = true)
+                    Metric("已记录日期","$recorded / $elapsed 天",Modifier.weight(1f))
+                }
             }
             Text(if(now<bounds.last()) "本周截至当前时刻 · 按已确认记录汇总" else "按已确认记录汇总",Modifier.padding(horizontal=20.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         }

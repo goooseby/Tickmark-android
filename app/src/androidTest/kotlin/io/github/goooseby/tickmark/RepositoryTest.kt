@@ -42,7 +42,7 @@ class RepositoryTest {
         assertEquals("笔记",repo.dao.allAnnotations().single().note)
         assertEquals(100L,repo.dao.allSessions().single().start)
         assertEquals("true",repo.dao.allConfig().find { it.key=="paused" }?.value)
-        try { transfer.parse(backup.replace("\"schemaVersion\": 2","\"schemaVersion\": 99")); fail("unsupported version") } catch (_:IllegalArgumentException) { }
+        try { transfer.parse(backup.replace("\"schemaVersion\": 3","\"schemaVersion\": 99")); fail("unsupported version") } catch (_:IllegalArgumentException) { }
         assertEquals(1,repo.dao.allSessions().size)
     }
     @Test fun privacyRuleRemovesIdentityFromRawAndDerivedRecords() = runBlocking {

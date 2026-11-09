@@ -8,7 +8,7 @@
 
 - applicationId 固定 `io.github.goooseby.tickmark`。
 - 首次公开发布前按用户要求统一包名；源码、测试、组件和安装文件提供器使用相同身份。此前开发包属于独立应用，不承诺覆盖安装或自动继承本地数据，必要时用JSON备份迁移。
-- 版本名称与versionCode仅在用户明确要求时调整，不随日常开发自动递增；本次经用户授权发布0.5.0 / 5。
+- 版本名称与 versionCode 在用户明确要求发布时调整。0.5.1 对应 versionCode 6。
 - 正式版本 tag 为 `v主.次.修订`，如 `v0.2.0`；versionCode 严格递增。
 - 最新版本通过 `GET /repos/goooseby/Tickmark-android/releases/latest` 查询，草稿和预发行不进入默认渠道。
 - 安装包命名 `tickmark-v0.2.0.apk`，使用 GitHub 资产 SHA-256 digest；没有校验信息时只提供发布页，不直接安装。

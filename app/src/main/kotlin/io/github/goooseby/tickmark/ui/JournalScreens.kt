@@ -9,8 +9,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Notes
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -76,7 +78,7 @@ internal fun journalDate(date:LocalDate):String="${date.monthValue}月${date.day
     Box(Modifier.fillMaxSize().imePadding()) {
         Column(Modifier.fillMaxSize()) {
                 Row(Modifier.padding(start=16.dp,end=8.dp,top=8.dp,bottom=4.dp),verticalAlignment=Alignment.CenterVertically) {
-                    OutlinedTextField(query,{query=it},Modifier.weight(1f),placeholder={Text("搜索记录")},leadingIcon={Icon(Icons.Outlined.Search,null)},trailingIcon={if(query.isNotEmpty()) IconButton(onClick={query=""}){Icon(Icons.Outlined.Close,"清除搜索")}},singleLine=true)
+                    OutlinedTextField(query,{query=it},Modifier.weight(1f),placeholder={Text("搜索记录")},leadingIcon={Icon(Icons.Outlined.Search,null)},trailingIcon={if(query.isNotEmpty()) IconButton(onClick={query=""}){Icon(Icons.Outlined.Close,"清除搜索")}},singleLine=true,shape=RoundedCornerShape(20.dp))
                     IconButton(onClick={calendar=true}) {Icon(Icons.Outlined.CalendarMonth,"按日期筛选")}
                 }
             FlowRow(Modifier.padding(horizontal=16.dp),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -88,9 +90,16 @@ internal fun journalDate(date:LocalDate):String="${date.monthValue}月${date.day
                 FilterChip(completedActions,{completedActions=true},label={Text("已完成")})
             }
             LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(bottom=100.dp)) {
-            if(query.isEmpty() && dateFilter==null && filter==0) item {JournalWeek(records,LocalDate.now(),onDaily);HorizontalDivider(Modifier.padding(top=8.dp))}
+            if(query.isEmpty() && dateFilter==null && filter==0) item {
+                ReportSurface {
+                    Column(Modifier.padding(bottom = 6.dp)) {
+                        JournalWeek(records,LocalDate.now(),onDaily)
+                    }
+                }
+            }
             if(visible.isEmpty()) item {
                 Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                    IconTile(if(filter==3) Icons.Outlined.Checklist else Icons.Outlined.EditNote)
                     Text(if(filter==3 && query.isBlank() && dateFilter==null) (if(completedActions) "没有已完成行动" else "没有待完成行动") else if(query.isNotBlank() || filter!=0 || dateFilter!=null) "没有匹配的记录" else "还没有记录",style=MaterialTheme.typography.titleMedium)
                     Text(if(query.isNotBlank()) "试试其他关键词或日期" else if(filter==3) "复盘中写下的小行动会显示在这里。" else "可以写一篇每日复盘，或随手记下一件事。",style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     if(query.isEmpty() && filter==0 && dateFilter==null) TextButton(onClick={onDaily(LocalDate.now())}){Text("写今日复盘")}
@@ -111,7 +120,7 @@ internal fun journalDate(date:LocalDate):String="${date.monthValue}月${date.day
                             if(row.preview.isNotBlank()) Text(row.preview,maxLines=2,overflow=TextOverflow.Ellipsis)
                             if(!row.draft && row.action.isNotBlank()) Text(if(row.actionDone) "行动已完成" else "行动待完成",style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
                         }},
-                        leadingContent={Icon(if(row.kind=="DAILY") Icons.Outlined.EditNote else Icons.Outlined.Notes,null,tint=MaterialTheme.colorScheme.primary)},
+                        leadingContent={IconTile(if(row.kind=="DAILY") Icons.Outlined.EditNote else Icons.AutoMirrored.Outlined.Notes)},
                         trailingContent={Box {
                             IconButton(onClick={menu=true}){Icon(Icons.Outlined.MoreVert,"记录操作：${row.heading}")}
                             DropdownMenu(menu,{menu=false}) {
@@ -127,7 +136,7 @@ internal fun journalDate(date:LocalDate):String="${date.monthValue}月${date.day
     }
     if(create) ModalBottomSheet(onDismissRequest={create=false}) {
         ListItem(headlineContent={Text("写每日复盘")},supportingContent={Text("记录今天，留下明天的一个行动")},leadingContent={Icon(Icons.Outlined.EditNote,null)},modifier=Modifier.clickable{create=false;onDaily(LocalDate.now())})
-        ListItem(headlineContent={Text("写随手记")},supportingContent={Text("想法、计划或一段个人记录")},leadingContent={Icon(Icons.Outlined.Notes,null)},modifier=Modifier.clickable{create=false;onNote()})
+        ListItem(headlineContent={Text("写随手记")},supportingContent={Text("想法、计划或一段个人记录")},leadingContent={Icon(Icons.AutoMirrored.Outlined.Notes,null)},modifier=Modifier.clickable{create=false;onNote()})
         Spacer(Modifier.height(24.dp))
     }
     if(calendar) JournalDatePicker(dateFilter?.let(LocalDate::parse) ?: LocalDate.now(),{calendar=false}) {dateFilter=it.toString();calendar=false}

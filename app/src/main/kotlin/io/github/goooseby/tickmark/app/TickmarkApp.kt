@@ -10,7 +10,7 @@ import io.github.goooseby.tickmark.widget.WidgetCoordinator
 import java.util.concurrent.TimeUnit
 
 class TickmarkApp : Application() {
-    val repository by lazy { TickRepository(this, Room.databaseBuilder(this, TickDatabase::class.java, "tickmark.db").addMigrations(MIGRATION_1_2,MIGRATION_2_3).build()) }
+    val repository by lazy { TickRepository(this, Room.databaseBuilder(this, TickDatabase::class.java, "tickmark.db").addMigrations(MIGRATION_1_2,MIGRATION_2_3,MIGRATION_3_4).build()) }
     val applicationScope=kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob()+kotlinx.coroutines.Dispatchers.IO)
     val updates by lazy { UpdateController(this) }
     override fun onConfigurationChanged(newConfig:android.content.res.Configuration) {

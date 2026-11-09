@@ -2,7 +2,7 @@
 
 个人 Android 手机使用轨迹与每日复盘工具。名称暂用 Tickmark。
 
-体验安装：[下载0.5.0 APK](https://github.com/goooseby/Tickmark-android/releases/download/v0.5.0/tickmark-v0.5.0.apk) · [版本说明](https://github.com/goooseby/Tickmark-android/releases/tag/v0.5.0)。首次使用请按应用提示开启使用记录访问权限。
+体验安装：[下载 0.5.1 APK](https://github.com/goooseby/Tickmark-android/releases/download/v0.5.1/tickmark-v0.5.1.apk) · [版本说明](https://github.com/goooseby/Tickmark-android/releases/tag/v0.5.1)。首次使用请按应用提示开启使用记录访问权限。
 
 核心问题：今天什么时候用了哪些应用、每次用了多久、哪些时段值得回看？
 
@@ -10,7 +10,7 @@
 
 2026-11-08：进入原生 Android 实现与模拟器验证阶段，已有可构建的 app + engine、Room 本地存储、系统使用事件采集、后台补采、日/周图表、独立记录页、每日复盘与行动跟进、标注及备份导出。页面按最新反馈改为图表优先，原始会话仅在详情主动展开。具体实现范围、验证结果与尚未完成的部分见 [开发与验收](docs/05-delivery.md)，不代表全部 P0 已验收。
 
-0.5.0加入页面与图表动效、固定尺寸报表图片分享和备份直接分享，并启用Release构建瘦身。
+0.5.1 调整设置、关于页和主页面的视觉层级，支持按日期导出使用数据，并独立显示系统可提供的历史汇总。
 
 ## 阅读顺序
 
@@ -28,6 +28,7 @@
 | [组件与未使用时段](docs/10-widgets-and-away.md) | 共享统计投影、桌面设计与更新机制 |
 | [记录与每日复盘](docs/11-records-and-reflection.md) | 草稿、搜索、每日复盘与行动跟进 |
 | [Release构建优化](docs/12-release-optimization.md) | 体积清单、R8与映射归档 |
+| [数据管理与系统历史](docs/14-data-management.md) | 按日期导出、完整备份与多粒度系统历史 |
 | [动效与分享](docs/13-motion-and-sharing.md) | 页面和图表动画、报表图片与文件分享 |
 
 原始输入完整保存在 [初稿归档](docs/archive/initial-prd.md)。正式决策以以上分工文档为准；实现中改变口径时同步更新文档。
