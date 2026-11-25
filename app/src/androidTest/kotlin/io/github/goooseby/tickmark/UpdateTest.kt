@@ -43,4 +43,28 @@ class UpdateTest {
         try {controller.verifyFile(installed,validBytes.copy(digest="0".repeat(64)));fail("wrong hash")} catch(e:IllegalArgumentException) {assertTrue(e.message!!.contains("校验"))}
         try {controller.verifyFile(installed,validBytes);fail("already installed")} catch(e:IllegalArgumentException) {assertTrue(e.message!!.contains("版本"))}
     }
+
+    @Test fun restoredDownloadKeepsItsReleaseAndRejectsDuplicateStarts() = runBlocking {
+        val name = "update-test-${UUID.randomUUID()}"
+        val prefs = context.getSharedPreferences(name, 0)
+        val original = release()
+        val next = original.copy(tag = "v99.0.1")
+        val savedId = Long.MAX_VALUE
+        prefs.edit().putString("release", original.json()).putLong("downloadId", savedId).commit()
+        try {
+            val client = object : ReleaseClient() {
+                override fun latest() = next
+            }
+            val controller = UpdateController(context, client, name)
+            assertTrue(controller.state.value.downloading)
+            assertNull(controller.state.value.progress)
+            controller.check()
+            controller.download()
+            assertEquals(savedId, prefs.getLong("downloadId", -1))
+            assertEquals(original, controller.state.value.release)
+            assertEquals(original, ReleaseInfo.restore(prefs.getString("release", null)!!))
+        } finally {
+            prefs.edit().clear().commit()
+        }
+    }
 }

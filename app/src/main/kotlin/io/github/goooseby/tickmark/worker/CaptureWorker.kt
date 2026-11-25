@@ -9,6 +9,7 @@ class CaptureWorker(context: Context, params: WorkerParameters) : CoroutineWorke
     override suspend fun doWork(): Result {
         val repo = (applicationContext as TickmarkApp).repository
         repo.sync()
+        (applicationContext as TickmarkApp).sync.synchronize()
         return if (repo.message.value == null) Result.success() else Result.retry()
     }
 }

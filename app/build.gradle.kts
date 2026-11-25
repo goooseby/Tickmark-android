@@ -11,9 +11,14 @@ android {
         applicationId = "io.github.goooseby.tickmark"
         minSdk = 29
         targetSdk = 36
-        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("6").get().toInt()
-        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.5.1").get()
+        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("7").get().toInt()
+        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.6.0").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val syncBaseUrl = providers.gradleProperty("tickmarkSyncBaseUrl")
+            .orElse(providers.environmentVariable("TICKMARK_SYNC_BASE_URL"))
+            .orElse("https://kovra.top/tickmark")
+            .get()
+        buildConfigField("String", "SYNC_API_BASE_URL", "\"${syncBaseUrl.replace("\\", "\\\\").replace("\"", "\\\"")}\"")
     }
     buildFeatures { compose = true; buildConfig = true }
     signingConfigs {
@@ -62,6 +67,8 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.10.01"))

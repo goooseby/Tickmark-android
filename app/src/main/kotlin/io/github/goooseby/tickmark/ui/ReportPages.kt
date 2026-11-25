@@ -47,6 +47,7 @@ import java.time.*
     }
 }
 
+
 @Composable internal fun ReviewReports(records:Records,date:LocalDate,from:Long,to:Long,onApp:(String)->Unit,onRange:()->Unit,onDate:(LocalDate)->Unit) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(bottom=20.dp)) {
         item { ChartTitle("近7天趋势") }

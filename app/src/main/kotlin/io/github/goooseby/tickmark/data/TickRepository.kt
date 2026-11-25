@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.distinctUntilChanged
 import io.github.goooseby.tickmark.data.report.Records
+import io.github.goooseby.tickmark.engine.sync.SyncProjectionInput
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -40,6 +41,9 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
     val records: Flow<Records> = db.invalidationTracker.createFlow(
         "sessions","spans","annotations","metadata","coverage","config","events","journal","system_summaries",emitInitialState=true
     ).map { snapshot() }.distinctUntilChanged().flowOn(Dispatchers.IO)
+    val syncInputs: Flow<SyncProjectionInput> = db.invalidationTracker.createFlow(
+        "sessions", "spans", "metadata", "coverage", emitInitialState = true
+    ).map { syncInput() }.flowOn(Dispatchers.IO)
 
     suspend fun snapshot(): Records = withContext(Dispatchers.IO) {
         db.withTransaction {
@@ -47,6 +51,25 @@ class TickRepository(val context: Context, val db: TickDatabase, private val cap
                 dao.allConfig().associate { it.key to it.value },dao.allUnlocks(),dao.allJournal(),dao.allSummaries())
         }
     }
+    suspend fun syncInput(): SyncProjectionInput = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            val sessions = dao.allSessions()
+            val spans = dao.allSpans()
+            val apps = dao.allApps()
+            val coverage = dao.allCoverage()
+            val records = Records(sessions, spans, emptyList(), apps, coverage)
+            SyncProjectionInput(
+                spans = records.deviceSpans,
+                sessions = sessions.map { io.github.goooseby.tickmark.engine.model.Session(it.pkg, it.start, it.end, it.inferred, it.ongoing) },
+                coverage = coverage.map { it.start until it.end },
+                hiddenPackages = apps.filter { it.hidden || it.excluded }.map { it.pkg }.toSet(),
+                appNames = apps.associate { it.pkg to it.name },
+                sourceTimeZone = ZoneId.systemDefault(),
+                now = System.currentTimeMillis(),
+            )
+        }
+    }
+
     fun hasAccess(): Boolean = context.getSystemService(AppOpsManager::class.java)
         .checkOpNoThrow(AppOpsManager.OPSTR_GET_USAGE_STATS, Process.myUid(), context.packageName) == AppOpsManager.MODE_ALLOWED
 

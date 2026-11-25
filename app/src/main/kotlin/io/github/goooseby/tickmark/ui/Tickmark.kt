@@ -48,6 +48,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -58,6 +59,7 @@ import io.github.goooseby.tickmark.engine.model.overlap
 import io.github.goooseby.tickmark.engine.model.unionDuration
 import io.github.goooseby.tickmark.engine.analytics.ReportEngine
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.*
@@ -91,13 +93,23 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     val error by repo.message.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val updates = remember { (repo.context.applicationContext as TickmarkApp).updates }
+    val app = context.applicationContext as TickmarkApp
+    val updates = remember { app.updates }
+    val sync = remember { app.sync }
     val lifecycle = LocalLifecycleOwner.current
     var access by remember { mutableStateOf(repo.hasAccess()) }
     DisposableEffect(lifecycle) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { access = repo.hasAccess(); vm.sync(); scope.launch { updates.check(automatic=true) } } }
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) { access = repo.hasAccess(); vm.sync(); scope.launch { sync.synchronize() }; scope.launch { updates.check(automatic=true) } } }
         lifecycle.lifecycle.addObserver(observer)
         onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(sync, lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                sync.synchronize()
+                delay(30_000)
+            }
+        }
     }
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var reviewWeek by rememberSaveable { mutableStateOf(true) }
@@ -235,7 +247,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
         val weekBounds = ReportEngine.weekBoundaries(date,ZoneId.systemDefault())
         val from = rangeStart ?: if(weekly) weekBounds.first() else dayStart(date)
         val to = minOf(rangeEnd ?: if(weekly) weekBounds.last() else dayStart(date.plusDays(1)), System.currentTimeMillis())
-            val title = when { settingsRoute!=null -> when { settingsRoute!!.startsWith("app:")->records.apps.find{it.pkg==settingsRoute!!.removePrefix("app:")}?.name ?: "应用设置"; else->mapOf("apps" to "应用管理","goals" to "每日目标","appearance" to "外观","capture" to "采集状态","data" to "数据管理","history" to "系统历史汇总","updates" to "版本与更新","privacy" to "隐私说明","project" to "关于","widgets" to "桌面组件")[settingsRoute] ?: "设置" }; detail=="@away"->"未使用时段"; detail=="@journal"->"每日复盘"; detail == "@range" -> "时段复盘"; detail != null -> appName(detail!!, records); tab == 0 -> if (date == LocalDate.now()) "今日" else "每日概览"; tab == 1 -> "回顾"; tab == 2 -> "记录"; else -> "设置" }
+            val title = when { settingsRoute!=null -> when { settingsRoute!!.startsWith("app:")->records.apps.find{it.pkg==settingsRoute!!.removePrefix("app:")}?.name ?: "应用设置"; else->mapOf("apps" to "应用管理","goals" to "每日目标","appearance" to "外观","capture" to "采集状态","data" to "数据管理","sync" to "跨设备同步","history" to "系统历史汇总","updates" to "版本与更新","privacy" to "隐私说明","project" to "关于","widgets" to "桌面组件")[settingsRoute] ?: "设置" }; detail=="@away"->"未使用时段"; detail=="@journal"->"每日复盘"; detail == "@range" -> "时段复盘"; detail != null -> appName(detail!!, records); tab == 0 -> if (date == LocalDate.now()) "今日" else "每日概览"; tab == 1 -> "回顾"; tab == 2 -> "记录"; else -> "设置" }
         Scaffold(
             topBar = { TopAppBar(title = { Crossfade(title,animationSpec=tween(180),label="page-title") {Text(it,maxLines=1,overflow=TextOverflow.Ellipsis)} }, navigationIcon = {
                 if (settingsRoute!=null || detail != null) IconButton(onClick = { back() }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "返回") }
@@ -290,6 +302,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
                         "appearance" -> AppearanceSettings(records.config["theme"] ?: "system") { value->task { repo.setConfig("theme" to value) } }
                         "capture" -> CaptureSettings(records,access,onPermission={ context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },onPaused={ task {repo.setPaused(it);if(!it) vm.sync()} },onRefresh={vm.sync()})
                         "privacy" -> PrivacySettings()
+                        "sync" -> SyncSettings(sync, sync.isConfigured)
                         "updates" -> UpdateScreen(updates)
                         "project" -> AboutSettings()
                         "widgets" -> WidgetSettings(records,access)

@@ -1,6 +1,7 @@
 package io.github.goooseby.tickmark.data
 
 import androidx.room.*
+import io.github.goooseby.tickmark.data.sync.*
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "events", indices = [Index("time")])
@@ -87,5 +88,21 @@ val MIGRATION_3_4=object:androidx.room.migration.Migration(3,4) {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_system_summaries_start ON system_summaries(start)")
     }
 }
-@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class,JournalRow::class,SystemUsageSummary::class], version = 4, exportSchema = false)
-abstract class TickDatabase : RoomDatabase() { abstract fun dao(): TickDao }
+val MIGRATION_4_5=object:androidx.room.migration.Migration(4,5) {
+    override fun migrate(db:androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS sync_account (accountId TEXT NOT NULL, deviceId TEXT NOT NULL, deviceName TEXT NOT NULL, epoch TEXT NOT NULL, fromUtcDay TEXT NOT NULL, throughUtcDay TEXT, status TEXT NOT NULL, cursor TEXT, snapshotId TEXT, snapshotEpoch TEXT, snapshotCursor TEXT, lastSequence INTEGER NOT NULL, lastSuccessAt INTEGER NOT NULL, lastError TEXT, updatedAt INTEGER NOT NULL, PRIMARY KEY(accountId))")
+        db.execSQL("CREATE TABLE IF NOT EXISTS sync_revisions (accountId TEXT NOT NULL, deviceId TEXT NOT NULL, utcDay TEXT NOT NULL, revision INTEGER NOT NULL, PRIMARY KEY(accountId,deviceId,utcDay))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_revisions_accountId_deviceId ON sync_revisions(accountId,deviceId)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS sync_outbox (accountId TEXT NOT NULL, deviceId TEXT NOT NULL, utcDay TEXT NOT NULL, revision INTEGER NOT NULL, payloadVersion INTEGER NOT NULL, payloadJson TEXT, status TEXT NOT NULL, attempts INTEGER NOT NULL, lastError TEXT, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL, PRIMARY KEY(accountId,deviceId,utcDay))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_outbox_accountId_deviceId_status ON sync_outbox(accountId,deviceId,status)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS sync_mirror (accountId TEXT NOT NULL, deviceId TEXT NOT NULL, utcDay TEXT NOT NULL, revision INTEGER NOT NULL, payloadVersion INTEGER NOT NULL, payloadJson TEXT, deleted INTEGER NOT NULL, sequence INTEGER NOT NULL, PRIMARY KEY(accountId,deviceId,utcDay))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_mirror_accountId ON sync_mirror(accountId)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_mirror_accountId_deviceId ON sync_mirror(accountId,deviceId)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS sync_snapshot_stage (accountId TEXT NOT NULL, deviceId TEXT NOT NULL, utcDay TEXT NOT NULL, revision INTEGER NOT NULL, payloadVersion INTEGER NOT NULL, payloadJson TEXT, deleted INTEGER NOT NULL, sequence INTEGER NOT NULL, PRIMARY KEY(accountId,deviceId,utcDay))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_snapshot_stage_accountId ON sync_snapshot_stage(accountId)")
+        db.execSQL("CREATE TABLE IF NOT EXISTS sync_devices (accountId TEXT NOT NULL, deviceId TEXT NOT NULL, name TEXT NOT NULL, lastSeenAt INTEGER, revoked INTEGER NOT NULL, PRIMARY KEY(accountId,deviceId))")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_devices_accountId ON sync_devices(accountId)")
+    }
+}
+@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class,JournalRow::class,SystemUsageSummary::class,SyncAccountRow::class,SyncRevisionRow::class,SyncOutboxRow::class,SyncMirrorRow::class,SyncSnapshotRow::class,SyncDeviceRow::class], version = 5, exportSchema = false)
+abstract class TickDatabase : RoomDatabase() { abstract fun dao(): TickDao; abstract fun syncDao(): SyncDao }

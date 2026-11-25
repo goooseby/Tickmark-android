@@ -5,11 +5,11 @@ on:
       version:
         description: 'Version without v prefix, e.g. 0.2.0'
         required: true
-        default: '0.5.1'
+        default: '0.6.0'
       version_code:
         description: 'Strictly increasing Android versionCode'
         required: true
-        default: '6'
+        default: '7'
 permissions:
   contents: read
 concurrency:
@@ -42,7 +42,7 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: python scripts/prepare-release.py
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - run: ./gradlew :engine:test :app:assembleRelease :app:lintRelease -PtickmarkVersionName="$VERSION" -PtickmarkVersionCode="$VERSION_CODE" --console=plain
+      - run: ./gradlew :engine:test :app:testReleaseUnitTest :app:assembleRelease :app:lintRelease -PtickmarkVersionName="$VERSION" -PtickmarkVersionCode="$VERSION_CODE" --console=plain
       - name: Verify and prepare files
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/release/app-release.apk

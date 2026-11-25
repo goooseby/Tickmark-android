@@ -8,7 +8,7 @@ import io.github.goooseby.tickmark.engine.model.DeviceState
 import java.time.LocalDate
 import java.time.ZoneId
 
-/** Read as one Room transaction; shared by screen state and widget publishing. */
+
 data class Records(
     val sessions: List<SessionRow> = emptyList(),
     val spans: List<SpanRow> = emptyList(),
@@ -32,4 +32,5 @@ data class Records(
 
     fun dayReport(date: LocalDate, zone: ZoneId = ZoneId.systemDefault(), now: Long = System.currentTimeMillis()): DeviceReport =
         DeviceReportEngine.day(deviceSpans,date,zone,now)
+
 }

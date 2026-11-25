@@ -85,6 +85,8 @@ internal fun SettingsHome(records: Records, access: Boolean, onNavigate: (String
                 ) { onNavigate("capture") }
                 SettingsDivider()
                 SettingsLink("数据管理", "导出、备份与恢复", Icons.Outlined.Storage) { onNavigate("data") }
+                SettingsDivider()
+                SettingsLink("跨设备同步", "账号、设备与待上传状态", Icons.Outlined.CloudSync) { onNavigate("sync") }
             }
         }
         item {
@@ -138,7 +140,7 @@ internal fun SettingsGroup(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SettingsDivider() {
+internal fun SettingsDivider() {
     HorizontalDivider(
         Modifier.padding(start = 62.dp, end = 14.dp),
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
@@ -301,9 +303,9 @@ internal fun SettingsLink(
     LazyColumn(contentPadding = PaddingValues(vertical = 12.dp)) {
         item {
             SettingsGroup {
-                PrivacyRow("使用记录", "只读取应用使用、屏幕和锁屏事件。记录与备注保存在本机，不上传，不读取聊天、网页、键盘或截图内容。", Icons.Outlined.Lock)
+                PrivacyRow("使用记录", "开启跨设备同步后，只上传设备状态和应用会话。日记、草稿、复盘、标注、原始系统事件和使用访问权限状态原文保留在本机。", Icons.Outlined.Lock)
                 SettingsDivider()
-                PrivacyRow("网络访问", "检查更新和下载时访问 GitHub，GitHub 会收到 IP 地址等请求信息。应用使用记录不随请求发送。自动检查默认关闭。", Icons.Outlined.Language)
+                PrivacyRow("网络访问", "检查更新时访问 GitHub。登录和同步时访问 Tickmark 服务器，验证码通过邮箱发送。", Icons.Outlined.Language)
                 SettingsDivider()
                 PrivacyRow("备份与排除", "系统自动备份已关闭。手动备份可能包含完整轨迹和备注。排除某应用后只保留匿名时段，手写备注仍保留。", Icons.Outlined.Backup)
             }
@@ -347,7 +349,18 @@ private fun PrivacyRow(title: String, summary: String, icon: ImageVector) {
         state.release?.let { release ->
             item { HorizontalDivider();Text(release.title,Modifier.padding(top=14.dp),style=MaterialTheme.typography.titleMedium);Text(release.notes.ifBlank {"此版本未提供更新说明"},style=MaterialTheme.typography.bodyMedium) }
             item {
-                if(state.downloading) { if(state.progress!=null) LinearProgressIndicator(progress={state.progress!!/100f},modifier=Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth()); TextButton(onClick={scope.launch {controller.cancel()}}) {Text("取消下载${state.progress?.let {" · $it%"} ?: ""}")} }
+                if (state.downloading) {
+                    // Material reads this value later, during drawing and accessibility updates.
+                    val progress = state.progress
+                    if (progress == null) {
+                        LinearProgressIndicator(Modifier.fillMaxWidth())
+                    } else {
+                        LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
+                    }
+                    TextButton(onClick = { scope.launch { controller.cancel() } }) {
+                        Text(progress?.let { "取消下载 · $it%" } ?: "取消下载")
+                    }
+                }
                 else if(state.ready) Button(onClick={scope.launch {controller.install()}}) {Text("安装更新")}
                 else if(release.apk!=null && release.digest!=null) Button(onClick={scope.launch {controller.download()}}) {Text("下载安装包 · ${"%.1f".format(release.bytes/1_048_576.0)} MB")}
                 else Text("此版本暂不支持应用内下载，请打开发布页查看。",style=MaterialTheme.typography.bodyMedium)
