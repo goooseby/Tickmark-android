@@ -41,6 +41,25 @@ class SyncProjectorTest {
         assertTrue(SyncProjector.project(input.copy(coverage = emptyList()), day).deviceIntervals.isEmpty())
     }
 
+    @Test fun localMidnightClipsBothAppAndDeviceIntervalsWithoutChangingUtcShards() {
+        val date = LocalDate.of(2026, 11, 25)
+        for ((zone, expectedDay) in listOf("Asia/Shanghai" to day, "America/Los_Angeles" to date)) {
+            val midnight = date.atStartOfDay(ZoneId.of(zone)).toInstant().toEpochMilli()
+            val input = input(
+                spans = listOf(DeviceSpan(midnight - 500, midnight + 500, DeviceState.IN_USE)),
+                sessions = listOf(Session("pkg", midnight - 500, midnight + 500)),
+                coverage = listOf((midnight - 500) until (midnight + 500)),
+                now = midnight + 500,
+            )
+            assertEquals(expectedDay, SyncProjector.utcDay(midnight))
+            val payload = SyncProjector.project(input, expectedDay, midnight)
+            assertEquals(midnight, payload.appIntervals.single().startMs)
+            assertEquals(midnight, payload.deviceIntervals.single().startMs)
+            assertEquals(midnight + 500, payload.appIntervals.single().endMs)
+            assertTrue(SyncProjector.project(input, expectedDay.minusDays(1), midnight).appIntervals.isEmpty())
+        }
+    }
+
     @Test fun lockedAndScreenOffAreOfflineWithReasons() {
         val payload = SyncProjector.project(input(
             spans = listOf(

@@ -74,6 +74,7 @@ class WidgetCaptureWorker(context:Context,params:WorkerParameters):CoroutineWork
         val repo=(applicationContext as TickmarkApp).repository
         val disabled=!repo.hasAccess() || repo.snapshot().config["paused"]=="true"
         if(!disabled) repo.sync()
+        if(!disabled && repo.message.value==null) repo.setConfig("lastBackgroundCapture" to System.currentTimeMillis().toString())
         WidgetCoordinator.publish(applicationContext)
         return if(disabled || repo.message.value==null) Result.success() else Result.retry()
     }

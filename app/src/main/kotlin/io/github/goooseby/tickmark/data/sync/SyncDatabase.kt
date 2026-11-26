@@ -10,6 +10,7 @@ import androidx.room.Query
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 @Entity(tableName = "sync_account")
 data class SyncAccountRow(
@@ -28,6 +29,7 @@ data class SyncAccountRow(
     val lastSuccessAt: Long = 0,
     val lastError: String? = null,
     val updatedAt: Long,
+    val fromInstantMs: Long? = null,
 )
 
 @Entity(
@@ -207,6 +209,9 @@ interface SyncDao {
     @Query("DELETE FROM sync_outbox WHERE accountId=:accountId")
     suspend fun deleteOutbox(accountId: String)
 
+    @Query("DELETE FROM sync_outbox WHERE accountId=:accountId AND deviceId=:deviceId AND (utcDay<:from OR (:through IS NOT NULL AND utcDay>:through))")
+    suspend fun discardOutboxOutsideRange(accountId: String, deviceId: String, from: String, through: String?)
+
     @Query("DELETE FROM sync_mirror WHERE accountId=:accountId")
     suspend fun deleteMirror(accountId: String)
 
@@ -219,3 +224,4 @@ interface SyncDao {
 
 fun SyncAccountRow.fromDay(): LocalDate = LocalDate.parse(fromUtcDay)
 fun SyncAccountRow.throughDay(): LocalDate? = throughUtcDay?.let(LocalDate::parse)
+fun SyncAccountRow.uploadStartMs(): Long = fromInstantMs ?: fromDay().atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()

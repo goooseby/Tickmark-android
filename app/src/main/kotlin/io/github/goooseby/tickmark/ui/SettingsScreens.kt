@@ -2,7 +2,12 @@ package io.github.goooseby.tickmark.ui
 
 import android.content.Intent
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
+import android.content.Context
 import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.repeatOnLifecycle
 import io.github.goooseby.tickmark.BuildConfig
 import io.github.goooseby.tickmark.R
@@ -268,6 +274,20 @@ internal fun SettingsLink(
     }
 }
 @Composable internal fun CaptureSettings(records:Records,access:Boolean,onPermission:()->Unit,onPaused:(Boolean)->Unit,onRefresh:()->Unit) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current
+    val scheme = MaterialTheme.colorScheme
+    var batteryExempt by remember { mutableStateOf(batteryOptimizationExempt(context)) }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) batteryExempt = batteryOptimizationExempt(context)
+        }
+        lifecycle.lifecycle.addObserver(observer)
+        onDispose { lifecycle.lifecycle.removeObserver(observer) }
+    }
+    val paused = records.config["paused"] == "true"
+    val backgroundCapture = records.config["lastBackgroundCapture"]?.toLongOrNull()
+    val stale = access && !paused && backgroundCapture != null && System.currentTimeMillis() - backgroundCapture > 12 * 3_600_000L
     LazyColumn(contentPadding = PaddingValues(top = 12.dp, bottom = 20.dp)) {
         item {
             SettingsGroup {
@@ -277,7 +297,7 @@ internal fun SettingsLink(
                     headlineContent = { Text("自动采集") },
                     supportingContent = { Text("打开时刷新，后台定期补采") },
                     leadingContent = { IconTile(Icons.Outlined.QueryStats) },
-                    trailingContent = { Switch(records.config["paused"] != "true", { onPaused(!it) }) },
+                    trailingContent = { Switch(!paused, { onPaused(!it) }) },
                     colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                 )
                 SettingsDivider()
@@ -292,11 +312,94 @@ internal fun SettingsLink(
                 )
             }
         }
+        if (stale) item {
+            ListItem(
+                headlineContent = { Text("超过 12 小时没有后台补采") },
+                supportingContent = { Text("系统可能限制了后台运行。可检查下方的电池优化与厂商设置。") },
+                leadingContent = { IconTile(Icons.Outlined.Warning, scheme.errorContainer, scheme.onErrorContainer) },
+            )
+        }
+        item { SettingsSection("后台运行") }
+        item {
+            SettingsGroup {
+                SettingsLink(
+                    "电池优化",
+                    if (batteryExempt) "已豁免，后台补采更稳定" else "未豁免，系统可能延后补采",
+                    Icons.Outlined.BatterySaver,
+                    color = if (batteryExempt) scheme.tertiaryContainer else scheme.secondaryContainer,
+                    ink = if (batteryExempt) scheme.onTertiaryContainer else scheme.onSecondaryContainer,
+                ) { requestBatteryOptimizationExemption(context) }
+                SettingsDivider()
+                SettingsLink("厂商后台限制", "允许自启动与后台活动", Icons.Outlined.PowerSettingsNew) { openVendorBackgroundSettings(context) }
+                SettingsDivider()
+                ListItem(
+                    headlineContent = { Text("上次后台补采") },
+                    supportingContent = {
+                        Text(backgroundCapture?.let { instant ->
+                            val time = Instant.ofEpochMilli(instant).atZone(ZoneId.systemDefault())
+                            val age = (System.currentTimeMillis() - instant).coerceAtLeast(0)
+                            "${time.format(DateTimeFormatter.ofPattern("M月d日 HH:mm"))} · 距今 ${duration(age)}"
+                        } ?: "尚未在后台运行")
+                    },
+                    leadingContent = { IconTile(Icons.Outlined.Schedule) },
+                    colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                )
+            }
+        }
         item { Text("系统可能延后后台补采。若出现记录空档，可打开应用刷新。",Modifier.padding(horizontal=20.dp,vertical=12.dp),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
         item { SettingsSection("记录诊断") }
         item { ListItem(headlineContent={Text("设备统计口径")},supportingContent={Text(if(records.config["screenOnly"]=="true") "设备没有安全锁屏，按屏幕可交互时间统计" else "按屏幕与锁屏事件统计")}) }
         item { ListItem(headlineContent={Text("状态空档的原因")},supportingContent={Text("首次授权、手机重启或系统清理旧事件后，部分时段可能缺少屏幕和锁屏记录。")}) }
         item { ListItem(headlineContent={Text("无法补回的历史")},supportingContent={Text("系统已不再提供的事件无法凭空恢复。打开应用、确认授权并刷新，可补采系统仍保留的范围。")}) }
+    }
+}
+
+private fun batteryOptimizationExempt(context: Context): Boolean =
+    context.getSystemService(PowerManager::class.java).isIgnoringBatteryOptimizations(context.packageName)
+
+private fun requestBatteryOptimizationExemption(context: Context) {
+    val direct = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${context.packageName}"))
+    try {
+        context.startActivity(direct)
+    } catch (_: ActivityNotFoundException) {
+        runCatching { context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) }
+    }
+}
+
+private fun openVendorBackgroundSettings(context: Context) {
+    val candidates = when (Build.MANUFACTURER.lowercase()) {
+        "xiaomi", "redmi", "poco" -> listOf(
+            ComponentName("com.miui.securitycenter", "com.miui.permcenter.autostart.AutoStartManagementActivity"),
+        )
+        "huawei" -> listOf(
+            ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+            ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.optimize.process.ProtectActivity"),
+        )
+        "honor" -> listOf(
+            ComponentName("com.hihonor.systemmanager", "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+            ComponentName("com.huawei.systemmanager", "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"),
+        )
+        "oppo", "realme", "oneplus" -> listOf(
+            ComponentName("com.coloros.safecenter", "com.coloros.safecenter.permission.startup.StartupAppListActivity"),
+            ComponentName("com.oplus.safecenter", "com.oplus.safecenter.permission.startup.StartupAppListActivity"),
+        )
+        "vivo", "iqoo" -> listOf(
+            ComponentName("com.vivo.permissionmanager", "com.vivo.permissionmanager.activity.BgStartUpManagerActivity"),
+            ComponentName("com.iqoo.secure", "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"),
+        )
+        "samsung" -> listOf(
+            ComponentName("com.samsung.android.lool", "com.samsung.android.sm.ui.battery.BatteryActivity"),
+        )
+        "meizu" -> listOf(
+            ComponentName("com.meizu.safe", "com.meizu.safe.security.SHOW_APPSEC"),
+        )
+        else -> emptyList()
+    }
+    for (component in candidates) {
+        if (runCatching { context.startActivity(Intent().setComponent(component)) }.isSuccess) return
+    }
+    runCatching {
+        context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")))
     }
 }
 @Composable internal fun PrivacySettings() {
@@ -324,7 +427,7 @@ private fun PrivacyRow(title: String, summary: String, icon: ImageVector) {
     }
 }
 @Composable internal fun UpdateScreen(controller:UpdateController) {
-    val state by controller.state.collectAsStateWithLifecycle()
+    val state = controller.state.collectAsStateWithLifecycle().value
     val scope=rememberCoroutineScope(); val context=LocalContext.current
     val lifecycle=LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(controller,lifecycle) { lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {while(true) {controller.refresh();delay(1500)}} }
@@ -350,16 +453,7 @@ private fun PrivacyRow(title: String, summary: String, icon: ImageVector) {
             item { HorizontalDivider();Text(release.title,Modifier.padding(top=14.dp),style=MaterialTheme.typography.titleMedium);Text(release.notes.ifBlank {"此版本未提供更新说明"},style=MaterialTheme.typography.bodyMedium) }
             item {
                 if (state.downloading) {
-                    // Material reads this value later, during drawing and accessibility updates.
-                    val progress = state.progress
-                    if (progress == null) {
-                        LinearProgressIndicator(Modifier.fillMaxWidth())
-                    } else {
-                        LinearProgressIndicator(progress = { progress / 100f }, modifier = Modifier.fillMaxWidth())
-                    }
-                    TextButton(onClick = { scope.launch { controller.cancel() } }) {
-                        Text(progress?.let { "取消下载 · $it%" } ?: "取消下载")
-                    }
+                    UpdateDownloadProgress(state.progress) { scope.launch { controller.cancel() } }
                 }
                 else if(state.ready) Button(onClick={scope.launch {controller.install()}}) {Text("安装更新")}
                 else if(release.apk!=null && release.digest!=null) Button(onClick={scope.launch {controller.download()}}) {Text("下载安装包 · ${"%.1f".format(release.bytes/1_048_576.0)} MB")}
@@ -368,6 +462,20 @@ private fun PrivacyRow(title: String, summary: String, icon: ImageVector) {
         }
         item { HorizontalDivider();ListItem(headlineContent={Text("自动检查更新")},supportingContent={Text("打开应用时检查，每天最多一次，不自动下载")},trailingContent={Switch(state.autoCheck,controller::setAuto)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surface)) }
         item { Text("安装由系统确认，更新会保留本地记录。",style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+@Composable
+internal fun UpdateDownloadProgress(progress: Int?, onCancel: () -> Unit) {
+    // Drawing and accessibility may read the fraction after the next download status arrives.
+    val fraction = progress?.div(100f)
+    if (fraction == null) {
+        LinearProgressIndicator(Modifier.fillMaxWidth())
+    } else {
+        LinearProgressIndicator(progress = { fraction }, modifier = Modifier.fillMaxWidth())
+    }
+    TextButton(onClick = onCancel) {
+        Text(progress?.let { "取消下载 · $it%" } ?: "取消下载")
     }
 }
 @Composable

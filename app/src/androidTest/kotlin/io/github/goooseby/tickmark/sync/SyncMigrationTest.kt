@@ -7,6 +7,7 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.goooseby.tickmark.data.MIGRATION_4_5
+import io.github.goooseby.tickmark.data.MIGRATION_5_6
 import io.github.goooseby.tickmark.data.TickDatabase
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
@@ -39,6 +40,16 @@ class SyncMigrationTest {
             }
         }
         assertEquals(5, db.version)
+        db.execSQL(
+            "INSERT INTO sync_account (accountId,deviceId,deviceName,epoch,fromUtcDay,status,lastSequence,lastSuccessAt,updatedAt) " +
+                "VALUES ('account','phone','Phone','epoch','2026-11-25','active',0,0,1)",
+        )
+        MIGRATION_5_6.migrate(db)
+        db.query("SELECT fromUtcDay, fromInstantMs FROM sync_account WHERE accountId='account'").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals("2026-11-25", cursor.getString(0))
+            assertTrue(cursor.isNull(1))
+        }
         helper.close()
     }
 
@@ -68,11 +79,11 @@ class SyncMigrationTest {
         sqlite.execSQL("INSERT INTO sessions VALUES ('s','pkg',1,2,0,0)")
         sqlite.version = 4
         sqlite.close()
-        val room = Room.databaseBuilder(context, TickDatabase::class.java, file.name).addMigrations(MIGRATION_4_5).build()
+        val room = Room.databaseBuilder(context, TickDatabase::class.java, file.name).addMigrations(MIGRATION_4_5, MIGRATION_5_6).build()
         try {
             room.openHelper.writableDatabase
             assertEquals(1, room.dao().allSessions().size)
-            assertEquals(5, room.openHelper.readableDatabase.version)
+            assertEquals(6, room.openHelper.readableDatabase.version)
         } finally {
             room.close()
             listOf(file, java.io.File(file.path + "-wal"), java.io.File(file.path + "-shm")).forEach { it.delete() }

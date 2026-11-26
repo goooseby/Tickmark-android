@@ -26,6 +26,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CloudSync
+import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Logout
 import androidx.compose.material.icons.outlined.Refresh
@@ -35,10 +36,11 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -49,6 +51,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +75,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.goooseby.tickmark.data.sync.SyncConfirmationRequired
 import io.github.goooseby.tickmark.data.sync.SyncCoordinator
@@ -123,7 +128,6 @@ private fun UnavailableSync() {
 @Composable
 private fun SyncLogin(coordinator: SyncCoordinator, reauth: Boolean) {
     val scope = rememberCoroutineScope()
-    val today = remember { LocalDate.now(ZoneOffset.UTC) }
     var email by rememberSaveable { mutableStateOf("") }
     var deviceName by rememberSaveable { mutableStateOf(Build.MODEL?.takeIf { it.isNotBlank() }?.take(80) ?: "Android") }
     var challenge by rememberSaveable { mutableStateOf<String?>(null) }
@@ -131,10 +135,8 @@ private fun SyncLogin(coordinator: SyncCoordinator, reauth: Boolean) {
     var resendAt by rememberSaveable { mutableStateOf(0L) }
     var elapsed by remember { mutableStateOf(SystemClock.elapsedRealtime()) }
     var code by remember { mutableStateOf("") }
-    var fromDay by rememberSaveable { mutableStateOf(today.toEpochDay()) }
-    val fromDate = LocalDate.ofEpochDay(fromDay)
-    var datePicker by remember { mutableStateOf(false) }
     var consent by remember { mutableStateOf(false) }
+    var submittedStartDay by rememberSaveable { mutableStateOf<Long?>(null) }
     var sending by remember { mutableStateOf(false) }
     var signingIn by remember { mutableStateOf(false) }
     val busy = sending || signingIn
@@ -243,6 +245,7 @@ private fun SyncLogin(coordinator: SyncCoordinator, reauth: Boolean) {
                             challenge = null
                             challengeEmail = null
                             code = ""
+                            submittedStartDay = null
                         }
                         email = it
                         error = null
@@ -351,75 +354,191 @@ private fun SyncLogin(coordinator: SyncCoordinator, reauth: Boolean) {
         }
     }
 
-    if (datePicker) {
-        val pickerState = rememberDatePickerState(initialSelectedDateMillis = fromDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
-        DatePickerDialog(
-            onDismissRequest = { datePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    pickerState.selectedDateMillis?.let { millis ->
-                        fromDay = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate().coerceAtMost(today).toEpochDay()
-                    }
-                    datePicker = false
-                }) { Text("选择") }
+    if (consent) {
+        SyncUploadRangeDialog(
+            deviceName = deviceName,
+            onDeviceNameChange = { if (it.length <= 80) deviceName = it },
+            onDismiss = {
+                submittedStartDay = null
+                consent = false
             },
-            dismissButton = { TextButton(onClick = { datePicker = false }) { Text("取消") } },
-        ) { DatePicker(state = pickerState) }
-    }
-
-    if (consent && !datePicker) {
-        val horizontalInset = if (LocalConfiguration.current.screenWidthDp <= 360) 12.dp else 0.dp
-        AlertDialog(
-            onDismissRequest = { consent = false },
-            modifier = Modifier.padding(horizontal = horizontalInset),
-            title = { Text("确认上传范围") },
-            text = {
-                Column(
-                    Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    OutlinedTextField(
-                        value = deviceName,
-                        onValueChange = { if (it.length <= 80) deviceName = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("设备名称") },
-                        singleLine = true,
-                        shape = fieldShape,
-                    )
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(selected = fromDate == today, onClick = { fromDay = today.toEpochDay() }, label = { Text("今天起") })
-                        FilterChip(selected = fromDate != today, onClick = { datePicker = true }, label = { Text(if (fromDate == today) "选择日期" else fromDate.toString()) })
-                    }
-                    Text("上传所选日期起的应用用时和设备状态。日记、标注及隐藏或排除的应用名称留在本机。")
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    consent = false
-                    signingIn = true
-                    error = null
-                    val challengeId = checkNotNull(challenge)
-                    scope.launch {
-                        try {
-                            coordinator.verifyCode(challengeId, code, deviceName.trim(), fromDate, null, historyConfirmed = true)
+            canConfirm = !busy && hasChallenge && code.length == 6 && deviceName.isNotBlank(),
+            initialDay = submittedStartDay,
+            onConfirm = { startDate ->
+                submittedStartDay = startDate.toEpochDay()
+                val cutoff = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant()
+                consent = false
+                signingIn = true
+                error = null
+                val challengeId = checkNotNull(challenge)
+                scope.launch {
+                    try {
+                        coordinator.verifyCode(challengeId, code, deviceName.trim(), cutoff, historyConfirmed = true)
+                        challenge = null
+                        code = ""
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (failure: Exception) {
+                        if (failure is SyncException && failure.code == SyncErrorCode.EXPIRED_CODE) {
                             challenge = null
                             code = ""
-                        } catch (cancelled: CancellationException) {
-                            throw cancelled
-                        } catch (failure: Exception) {
-                            if (failure is SyncException && failure.code == SyncErrorCode.EXPIRED_CODE) {
-                                challenge = null
-                                code = ""
-                            }
-                            error = syncErrorMessage(failure)
-                        } finally {
-                            signingIn = false
+                        }
+                        error = syncErrorMessage(failure)
+                    } finally {
+                        signingIn = false
+                    }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+internal fun SyncUploadRangeDialog(
+    deviceName: String,
+    onDeviceNameChange: (String) -> Unit,
+    canConfirm: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDate) -> Unit,
+    initialDay: Long? = null,
+) {
+    val localZone = ZoneId.systemDefault()
+    val today = LocalDate.now(localZone)
+    var selectedDay by rememberSaveable { mutableStateOf(initialDay) }
+    var datePicker by rememberSaveable { mutableStateOf(false) }
+    val fromDate = selectedDay?.let(LocalDate::ofEpochDay)?.coerceAtMost(today) ?: today
+    if (datePicker) {
+        UploadStartDatePicker(fromDate, today, onDismiss = { datePicker = false }) { date ->
+            selectedDay = date.toEpochDay().takeUnless { date == today }
+            datePicker = false
+        }
+    } else {
+        SyncUploadConsent(
+            deviceName = deviceName,
+            onDeviceNameChange = onDeviceNameChange,
+            fromDate = fromDate,
+            today = today,
+            onChangeDate = { datePicker = true },
+            onResetDate = { selectedDay = null },
+            onDismiss = onDismiss,
+            canConfirm = canConfirm,
+            onConfirm = { onConfirm(fromDate) },
+        )
+    }
+}
+
+@Composable
+private fun SyncUploadConsent(
+    deviceName: String,
+    onDeviceNameChange: (String) -> Unit,
+    fromDate: LocalDate,
+    today: LocalDate,
+    onChangeDate: () -> Unit,
+    onResetDate: () -> Unit,
+    onDismiss: () -> Unit,
+    canConfirm: Boolean,
+    onConfirm: () -> Unit,
+) {
+    val horizontalInset = if (LocalConfiguration.current.screenWidthDp <= 360) 12.dp else 0.dp
+    val dateLabel = if (fromDate == today) "今天（${fromDate.monthValue}月${fromDate.dayOfMonth}日）"
+        else fromDate.format(DateTimeFormatter.ofPattern("yyyy年M月d日"))
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        modifier = Modifier.padding(horizontal = horizontalInset),
+        title = { Text("确认上传范围") },
+        text = {
+            Column(
+                Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                OutlinedTextField(
+                    value = deviceName,
+                    onValueChange = onDeviceNameChange,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("设备名称") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text("上传开始日期", style = MaterialTheme.typography.labelLarge)
+                    OutlinedButton(
+                        onClick = onChangeDate,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                    ) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Outlined.DateRange, null, Modifier.size(18.dp))
+                            Text(dateLabel, Modifier.weight(1f))
+                            Text("更改")
                         }
                     }
-                }, enabled = !busy && hasChallenge && code.length == 6 && deviceName.isNotBlank()) { Text("确认并开启") }
-            },
-            dismissButton = { TextButton(onClick = { consent = false }, enabled = !busy) { Text("取消") } },
-        )
+                    Text("从这天零点起持续同步本机记录。", style = MaterialTheme.typography.bodySmall)
+                    if (fromDate != today) {
+                        TextButton(onClick = onResetDate) { Text("改为从今天起") }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onConfirm, enabled = canConfirm) { Text("开启同步") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+    )
+}
+
+@Composable
+private fun UploadStartDatePicker(
+    date: LocalDate,
+    today: LocalDate,
+    onDismiss: () -> Unit,
+    onSelect: (LocalDate) -> Unit,
+) {
+    // Material's date picker represents a calendar date as UTC midnight.
+    val pickerState = rememberDatePickerState(
+        initialSelectedDateMillis = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        selectableDates = remember(today) {
+            val latest = today.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+            object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) = utcTimeMillis <= latest
+                override fun isSelectableYear(year: Int) = year <= today.year
+            }
+        },
+    )
+    val selected = pickerState.selectedDateMillis?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
+    val confirm: @Composable () -> Unit = {
+        TextButton(onClick = { selected?.let(onSelect) }, enabled = selected != null && selected <= today) {
+            Text("使用此日期")
+        }
+    }
+    val cancel: @Composable () -> Unit = { TextButton(onClick = onDismiss) { Text("取消") } }
+    val picker: @Composable () -> Unit = {
+        DatePicker(pickerState, title = {
+            Text("选择上传开始日期", Modifier.padding(start = 24.dp, top = 16.dp), style = MaterialTheme.typography.labelLarge)
+        })
+    }
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    if (screenWidth < 360) {
+        // DatePickerDialog itself requires a 360 dp width on Android.
+        Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                shape = MaterialTheme.shapes.extraLarge,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    val dayCellSize = ((screenWidth - 40) / 7).coerceIn(40, 48).dp
+                    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides dayCellSize) {
+                        picker()
+                    }
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), horizontalArrangement = Arrangement.End) {
+                        cancel()
+                        confirm()
+                    }
+                }
+            }
+        }
+    } else {
+        DatePickerDialog(onDismissRequest = onDismiss, confirmButton = confirm, dismissButton = cancel, content = { picker() })
     }
 }
 

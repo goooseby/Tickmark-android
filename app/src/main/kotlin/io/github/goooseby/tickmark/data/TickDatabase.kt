@@ -104,5 +104,10 @@ val MIGRATION_4_5=object:androidx.room.migration.Migration(4,5) {
         db.execSQL("CREATE INDEX IF NOT EXISTS index_sync_devices_accountId ON sync_devices(accountId)")
     }
 }
-@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class,JournalRow::class,SystemUsageSummary::class,SyncAccountRow::class,SyncRevisionRow::class,SyncOutboxRow::class,SyncMirrorRow::class,SyncSnapshotRow::class,SyncDeviceRow::class], version = 5, exportSchema = false)
+val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE sync_account ADD COLUMN fromInstantMs INTEGER")
+    }
+}
+@Database(entities = [EventRow::class, SessionRow::class, SpanRow::class, AnnotationRow::class, AppRow::class, ConfigRow::class, CoverageRow::class,JournalRow::class,SystemUsageSummary::class,SyncAccountRow::class,SyncRevisionRow::class,SyncOutboxRow::class,SyncMirrorRow::class,SyncSnapshotRow::class,SyncDeviceRow::class], version = 6, exportSchema = false)
 abstract class TickDatabase : RoomDatabase() { abstract fun dao(): TickDao; abstract fun syncDao(): SyncDao }

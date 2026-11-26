@@ -35,6 +35,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -98,9 +99,11 @@ class SyncCoordinator(
             combine(store.account, repository.syncInputs) { account, _ -> account }.collectLatest { account ->
                 if (account?.status == "active") {
                     delay(5_000)
-                    val latest = store.currentAccount()
-                    if (latest?.status == "active") {
-                        if (stage(latest, repository.syncInput())) scheduleImmediate()
+                    mutex.withLock {
+                        val latest = store.currentAccount()
+                        if (latest?.status == "active") {
+                            if (stage(latest, repository.syncInput())) scheduleImmediate()
+                        }
                     }
                 }
             }
@@ -116,10 +119,9 @@ class SyncCoordinator(
         challengeId: String,
         code: String,
         deviceName: String,
-        fromUtcDay: LocalDate,
-        throughUtcDay: LocalDate?,
+        fromInclusive: Instant,
         historyConfirmed: Boolean,
-    ): Unit = withContext(Dispatchers.IO) {
+    ): Unit = withContext(Dispatchers.IO) { mutex.withLock {
         if (!configured) throw SyncException(SyncErrorCode.CONFIGURATION)
         require(!deviceName.isBlank() && deviceName.length <= 80)
         val deviceId = identity.installId()
@@ -130,16 +132,18 @@ class SyncCoordinator(
         require(session.deviceId == deviceId) { "服务器绑定的设备身份不一致" }
         val current = store.currentAccount()
         val sameAccount = current?.accountId == session.accountId && current.deviceId == deviceId
+        val fromMs = fromInclusive.toEpochMilli()
         val account = SyncAccountRow(
             accountId = session.accountId,
             deviceId = deviceId,
             deviceName = deviceName,
             epoch = session.epoch,
-            fromUtcDay = fromUtcDay.toString(),
-            throughUtcDay = throughUtcDay?.toString(),
+            fromUtcDay = SyncProjector.utcDay(fromMs).toString(),
+            throughUtcDay = null,
             status = "active",
             lastSuccessAt = if (sameAccount) current.lastSuccessAt else 0,
             updatedAt = System.currentTimeMillis(),
+            fromInstantMs = fromMs,
         )
         tokens.saveRefresh(session.accountId, session.refreshToken)
         tokens.saveAccess(session.accountId, session.accessToken, session.accessTokenExpiresAt)
@@ -147,7 +151,7 @@ class SyncCoordinator(
         previousInput = null
         previousAccountId = session.accountId
         scheduleImmediate()
-    }
+    } }
 
     suspend fun synchronize(): SyncRunResult = mutex.withLock { synchronizeLocked() }
 
@@ -271,13 +275,22 @@ class SyncCoordinator(
         }
         val from = account.fromDay()
         val through = account.throughDay()
+        val cutoff = account.uploadStartMs()
+        val todayUtc = SyncProjector.utcDay(input.now)
         val affected = SyncProjector.affectedDays(previousInput, input)
-        val days = (affected ?: SyncProjector.utcDays(from, through).toSet()).toMutableSet()
-        SyncProjector.utcDay(input.now).takeIf { it >= from && (through == null || it <= through) }?.let(days::add)
+        val days = affected?.toMutableSet() ?: buildSet {
+            addAll(store.recordedUploadDays(account))
+            for (coverage in input.coverage) {
+                val start = maxOf(coverage.first, cutoff)
+                val end = minOf(coverage.last, input.now)
+                if (start <= end) addAll(SyncProjector.utcDays(SyncProjector.utcDay(start), SyncProjector.utcDay(end)))
+            }
+        }.toMutableSet()
+        days.add(todayUtc)
         var staged = false
         days.filter { it >= from && (through == null || it <= through) }.sorted().forEachIndexed { index, day ->
             if (index % 50 == 0) yield()
-            if (store.stage(account, day, SyncProjector.project(input, day))) staged = true
+            if (store.stage(account, day, SyncProjector.project(input, day, cutoff))) staged = true
         }
         previousInput = input
         return staged

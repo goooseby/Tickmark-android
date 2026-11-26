@@ -7,9 +7,13 @@ import io.github.goooseby.tickmark.app.TickmarkApp
 
 class CaptureWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
-        val repo = (applicationContext as TickmarkApp).repository
+        val app = applicationContext as TickmarkApp
+        val repo = app.repository
         repo.sync()
-        (applicationContext as TickmarkApp).sync.synchronize()
-        return if (repo.message.value == null) Result.success() else Result.retry()
+        app.sync.synchronize()
+        val active = repo.hasAccess() && repo.snapshot().config["paused"] != "true"
+        val succeeded = active && repo.message.value == null
+        if (succeeded) repo.setConfig("lastBackgroundCapture" to System.currentTimeMillis().toString())
+        return if (succeeded || !active) Result.success() else Result.retry()
     }
 }

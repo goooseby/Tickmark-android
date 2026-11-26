@@ -160,6 +160,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
     val snack = remember { SnackbarHostState() }
     val transfer = remember { DataTransfer(repo) }
     val paused = records.config["paused"] == "true"
+    val staleBackgroundCapture = !paused && access && records.config["lastBackgroundCapture"]?.toLongOrNull()?.let { System.currentTimeMillis() - it > 12 * 3_600_000L } == true
     var preparingShare by remember{mutableStateOf(false)}
     fun task(block: suspend () -> Unit) { scope.launch { try { block() } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; snack.showSnackbar(e.message ?: "操作失败，原记录已保留") } } }
     fun deletedJournal(row:JournalRow?) {
@@ -283,6 +284,7 @@ internal fun dayStart(date: LocalDate) = date.atStartOfDay(ZoneId.systemDefault(
                     else TextButton(onClick={ context.startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS)) },modifier=Modifier.fillMaxWidth()) { Text("采集已暂停 · 恢复访问权限") }
                 }
                 if (paused && tab in 0..1 && journalEditor==null) TextButton(onClick = { task { repo.setPaused(false); vm.sync() } }, modifier = Modifier.fillMaxWidth()) { Text("采集已暂停 · 点此继续") }
+                if (staleBackgroundCapture && tab in 0..1 && journalEditor==null) TextButton(onClick={ openSettings("capture") },modifier=Modifier.fillMaxWidth()) { Text("超过 12 小时没有后台补采 · 检查设置") }
                 AnimatedContent(
                     targetState=ReportPage(tab,settingsRoute,detail,date,reviewWeek,weekly,from,to,rangeStart!=null),
                     contentKey={it.routeKey},modifier=Modifier.weight(1f).fillMaxWidth().pageEntry(Unit),

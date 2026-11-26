@@ -9,8 +9,8 @@ import java.time.LocalDate
 import java.time.ZoneOffset
 
 object SyncProjector {
-    fun project(input: SyncProjectionInput, day: LocalDate): SyncDayPayload {
-        val dayStart = utcStart(day)
+    fun project(input: SyncProjectionInput, day: LocalDate, notBeforeMs: Long = Long.MIN_VALUE): SyncDayPayload {
+        val dayStart = maxOf(utcStart(day), notBeforeMs)
         val dayEnd = utcStart(day.plusDays(1))
         val until = minOf(dayEnd, input.now)
         val coverage = clipCoverage(input.coverage, dayStart, until)

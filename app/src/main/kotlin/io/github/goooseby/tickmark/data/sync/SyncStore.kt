@@ -20,6 +20,9 @@ class SyncStore(private val db: TickDatabase) {
 
     fun devices(accountId: String) = dao.devices(accountId)
 
+    suspend fun recordedUploadDays(account: SyncAccountRow): List<LocalDate> =
+        dao.localRevisions(account.accountId, account.deviceId).map { LocalDate.parse(it.utcDay) }
+
     suspend fun activate(account: SyncAccountRow) = db.withTransaction {
         val previous = dao.currentAccount()
         if (previous != null && previous.accountId != account.accountId) clear(previous.accountId)
@@ -27,6 +30,7 @@ class SyncStore(private val db: TickDatabase) {
             dao.deleteOutbox(account.accountId)
             dao.deleteMirror(account.accountId)
         }
+        dao.discardOutboxOutsideRange(account.accountId, account.deviceId, account.fromUtcDay, account.throughUtcDay)
         dao.putAccount(account)
         dao.putDevice(SyncDeviceRow(account.accountId, account.deviceId, account.deviceName, null, false))
     }

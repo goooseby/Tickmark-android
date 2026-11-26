@@ -19,6 +19,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.time.LocalDate
+import java.time.Instant
 import java.time.ZoneOffset
 import java.net.URL
 
@@ -81,7 +82,7 @@ class SyncCoordinatorTest {
             SyncIdentityStore(registry.targetContext), client, client, true)
         val challenge = real.requestCode("sync-test@example.com")
         val code = withContext(Dispatchers.IO) { URL("$endpoint/__fixture/code").readText().trim() }
-        real.verifyCode(challenge.challengeId, code, "同步验收手机", day, null, historyConfirmed = true)
+        real.verifyCode(challenge.challengeId, code, "同步验收手机", Instant.ofEpochMilli(start), historyConfirmed = true)
         val active = store.currentAccount()!!
         try {
             assertEquals(SyncRunResult.SUCCESS, real.synchronize())
@@ -112,6 +113,19 @@ class SyncCoordinatorTest {
         val shard = transport.uploads.last().shards.single()
         assertEquals(2, shard.revision)
         assertNull(shard.payload)
+    }
+
+    @Test fun persistedStartClipsTheFirstUtcShardBeforeUploading() = runBlocking {
+        activate()
+        val account = store.currentAccount()!!
+        val cutoff = start + 500
+        store.activate(account.copy(fromInstantMs = cutoff))
+
+        assertEquals(SyncRunResult.SUCCESS, coordinator.synchronize())
+        val payload = transport.uploads.single().shards.single().payload!!
+        assertEquals(cutoff, payload.appIntervals.single().startMs)
+        assertEquals(cutoff, payload.deviceIntervals.single().startMs)
+        assertEquals(start + 1_000, payload.appIntervals.single().endMs)
     }
 
     @Test fun expiredAccessTokenRefreshesOnceAndContinues() = runBlocking {
