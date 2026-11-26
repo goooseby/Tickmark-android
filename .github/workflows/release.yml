@@ -5,11 +5,11 @@ on:
       version:
         description: 'Version without v prefix, e.g. 0.2.0'
         required: true
-        default: '0.6.0'
+        default: '0.6.1'
       version_code:
         description: 'Strictly increasing Android versionCode'
         required: true
-        default: '7'
+        default: '8'
 permissions:
   contents: read
 concurrency:

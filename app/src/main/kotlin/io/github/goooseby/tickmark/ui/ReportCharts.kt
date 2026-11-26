@@ -110,7 +110,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
     val sliceNames=shown.map { if(it.first=="@other") "其他应用" else appName(it.first,records) }
     var allApps by remember(from,to) { mutableStateOf(false) }
     val ring: @Composable (Boolean) -> Unit = { compact ->
-        val diameter = if (compact) 122.dp else 156.dp
+        val diameter = if (compact) 148.dp else 176.dp
         Box(Modifier.size(diameter), contentAlignment = Alignment.Center) {
             Canvas(Modifier.matchParentSize().semantics { contentDescription="应用前台时长构成：$description" }.pointerInput(shown) { detectTapGestures { point ->
                 val dx=point.x-size.width/2; val dy=point.y-size.height/2
@@ -121,7 +121,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
                     shown.forEach { slice -> val sweep=slice.second.toFloat()/total*360; if(angle>=boundary && angle<boundary+sweep && slice.first!="@other") onApp(slice.first); boundary+=sweep }
                 }
             } }) {
-                val stroke=if (compact) 17.dp.toPx() else 22.dp.toPx()
+                val stroke=if (compact) 20.dp.toPx() else 24.dp.toPx()
                 val inset=stroke/2
                 drawArc(track,0f,360f,false,Offset(inset,inset),Size(size.width-stroke,size.height-stroke),style=Stroke(stroke))
                 var angle=-90f
@@ -133,7 +133,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
                 }
             }
             Column(
-                Modifier.width(diameter - if (compact) 40.dp else 52.dp),
+                Modifier.width(diameter - if (compact) 48.dp else 56.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text("应用前台", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -153,9 +153,12 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
             ) {
                 Box(Modifier.size(9.dp).background(color,CircleShape))
                 if (compact) {
-                    Column(Modifier.weight(1f)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(sliceNames[i], style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${duration(amount)} · $percentage", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(duration(amount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                            Text(percentage, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
                     }
                 } else {
                     Text(sliceNames[i],Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium,maxLines=2,overflow=TextOverflow.Ellipsis)
@@ -169,7 +172,11 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val compact = maxWidth >= 340.dp && LocalDensity.current.fontScale < 1.3f
             if (compact) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         ring(true)
                         StatisticsInfoButton("应用构成统计说明", APP_COMPOSITION_INFO)
@@ -178,7 +185,7 @@ internal fun hourBoundaries(date:LocalDate):List<Long> {
                 }
             } else {
                 Column {
-                    Box(Modifier.fillMaxWidth().height(172.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().height(196.dp), contentAlignment = Alignment.Center) {
                         ring(false)
                         StatisticsInfoButton("应用构成统计说明", APP_COMPOSITION_INFO, Modifier.align(Alignment.TopEnd))
                     }

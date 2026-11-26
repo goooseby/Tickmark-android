@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.goooseby.tickmark"
         minSdk = 29
         targetSdk = 36
-        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("7").get().toInt()
-        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.6.0").get()
+        versionCode = providers.gradleProperty("tickmarkVersionCode").orElse("8").get().toInt()
+        versionName = providers.gradleProperty("tickmarkVersionName").orElse("0.6.1").get()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val syncBaseUrl = providers.gradleProperty("tickmarkSyncBaseUrl")
             .orElse(providers.environmentVariable("TICKMARK_SYNC_BASE_URL"))
