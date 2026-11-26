@@ -183,4 +183,12 @@
 - 浅色、深色及 360dp、1.3 倍字体实际截图检查：应用名、时长和百分比完整显示，无截断或重叠。检查后恢复模拟器浅色、1.0 字号和默认窗口。
 - ReportUiTest 与 ChartMotionTest 共 8 项设备测试通过；Debug、AndroidTest 构建和 Debug Lint 通过（0 错误、36 警告）。
 
+## 0.6.1 正式发布（2026-11-26）
+
+- 源码提交 `3eea4e7` 的 [Verify Android](https://github.com/goooseby/Tickmark-android/actions/runs/45807232313) 与 [Prepare signed release](https://github.com/goooseby/Tickmark-android/actions/runs/45807259722) 均通过，包含 Debug/Release 构建、App 与 Engine 单元测试和 Release Lint。
+- 下载发布资产核对包名 `io.github.goooseby.tickmark`、版本 0.6.1 / 8、APK v2 签名；证书 SHA-256 与 0.6.0 相同。APK 为 4,720,955 字节，SHA-256 为 `240e782967f05cb86dacb4e6579aaccfb09d7b193671e3b300b77314ed1deeb8`，与 SHA256SUMS、GitHub 资产 digest 一致；update.json 为 0.6.1 / 8。
+- 独立 API 36 模拟器先安装公开 0.6.0，授权并生成今日记录，再覆盖安装 0.6.1。首次安装时间保持 11:22:54，版本变为 0.6.1 / 8，使用记录保留；新版应用构成图更大，环形中心时长不再换行。
+- 已公开 [v0.6.1](https://github.com/goooseby/Tickmark-android/releases/tag/v0.6.1) 并设为最新；latest 接口、公开更新清单和校验文件可读，0.6.0 资产未替换。
+- 验证结束后移除模拟器测试安装与临时下载文件。
+
 
